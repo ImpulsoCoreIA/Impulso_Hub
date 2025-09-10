@@ -11,6 +11,11 @@ h6 {
   @apply font-medium text-n-slate-12;
 }
 
+// Accent tint for top-level headings
+h1 {
+  @apply text-n-accent;
+}
+
 p {
   text-rendering: optimizeLegibility;
   @apply mb-2 leading-[1.65] text-sm;

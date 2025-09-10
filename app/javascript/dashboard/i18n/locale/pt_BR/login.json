@@ -1,10 +1,10 @@
 {
   "LOGIN": {
-    "TITLE": "Entrar no Chatwoot",
+    "TITLE": "Bem vindo à ImpulsoCore",
     "EMAIL": {
-      "LABEL": "e-mail",
-      "PLACEHOLDER": "nome{'@'}empresa.com.br",
-      "ERROR": "Digite um endereço de endereço eletrônico válido"
+      "LABEL": "E-mail",
+      "PLACEHOLDER": "exemplo@empresa.com",
+      "ERROR": "Digite um e-mail válido"
     },
     "PASSWORD": {
       "LABEL": "Senha",
@@ -16,11 +16,11 @@
       "UNAUTH": "Usuário ou senha incorretos. Por favor, tente novamente."
     },
     "OAUTH": {
-      "GOOGLE_LOGIN": "Entrar com o Google",
-      "BUSINESS_ACCOUNTS_ONLY": "Use o endereço de endereço eletrônico da empresa para fazer ‘login’",
-      "NO_ACCOUNT_FOUND": "Não encontramos uma conta para seu endereço de correio eletrônico."
+      "GOOGLE_LOGIN": "Entrar com Google",
+      "BUSINESS_ACCOUNTS_ONLY": "Use o e-mail corporativo para entrar",
+      "NO_ACCOUNT_FOUND": "Não encontramos uma conta para este e-mail."
     },
-    "FORGOT_PASSWORD": "Esqueceu-se da sua senha?",
+    "FORGOT_PASSWORD": "Esqueceu sua senha?",
     "CREATE_NEW_ACCOUNT": "Criar nova conta",
     "SUBMIT": "Entrar"
   }

@@ -211,7 +211,21 @@ export const colors = {
     },
 
     black: '#000000',
-    brand: '#2781F6',
+    // ImpulsoCore brand + accents
+    brand: '#22d3ee',
+    brand2: '#2563eb',
+    accent: '#a5f3fc',
+    ok: '#16a34a',
+    warn: '#ca8a04',
+    danger: '#ef4444',
+    whatsapp: '#22c55e',
+    footerBg: '#060914',
+    footerText: '#9fb0c3',
+    slate900: '#111827',
+    slate300: '#cbd5e1',
+    panel: '#0f162e',
+    chatframe: '#111111',
+    buttonText: '#001225',
     background: 'rgb(var(--background-color) / <alpha-value>)',
     solid: {
       1: 'rgb(var(--solid-1) / <alpha-value>)',

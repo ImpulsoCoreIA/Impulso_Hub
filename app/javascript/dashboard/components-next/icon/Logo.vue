@@ -1,17 +1,20 @@
 <script setup>
-import { useAttrs } from 'vue';
+import { useAttrs, computed } from 'vue';
 import { useMapGetter } from 'dashboard/composables/store';
 
 const attrs = useAttrs();
 const globalConfig = useMapGetter('globalConfig/get');
+
+// Prefer the configured thumbnail, but fall back to ImpulsoCore asset
+const logoSrc = computed(() => {
+  const src = globalConfig.value?.logoThumbnail;
+  if (src && src !== '/brand-assets/logo_thumbnail.svg') return src;
+  return '/brand-assets/logo_sem_fundo.png';
+});
 </script>
 
 <template>
-  <img
-    v-if="globalConfig.logoThumbnail"
-    v-bind="attrs"
-    :src="globalConfig.logoThumbnail"
-  />
+  <img v-if="logoSrc" v-bind="attrs" :src="logoSrc" />
   <svg
     v-else
     v-once

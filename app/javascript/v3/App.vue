@@ -38,7 +38,10 @@ export default {
 </script>
 
 <template>
-  <div class="h-full min-h-screen w-full antialiased" :class="theme">
+  <div
+    class="h-full min-h-screen w-full antialiased bg-n-background text-n-slate-12 relative isolate before:content-[''] before:absolute before:-inset-x-[10%] before:-top-[10%] before:bottom-[40%] before:[background:radial-gradient(800px_360px_at_20%_0%,rgba(34,211,238,.22),transparent_55%),_radial-gradient(900px_420px_at_80%_0%,rgba(37,99,235,.18),transparent_60%)] before:pointer-events-none before:-z-10"
+    :class="theme"
+  >
     <router-view />
     <SnackbarContainer />
   </div>

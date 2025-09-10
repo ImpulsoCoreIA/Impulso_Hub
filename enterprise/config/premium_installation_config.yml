@@ -1,8 +1,8 @@
 # ------- Branding Related Config ------- #
 - name: INSTALLATION_NAME
-  value: 'Chatwoot'
+  value: 'ImpulsoCore'
 - name: LOGO_THUMBNAIL
-  value: '/brand-assets/logo_thumbnail.svg'
+  value: '/brand-assets/logo_sem_fundo.png'
 - name: LOGO
   value: '/brand-assets/logo.svg'
 - name: LOGO_DARK

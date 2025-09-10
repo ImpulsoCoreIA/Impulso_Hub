@@ -1,66 +1,40 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>We're sorry, but something went wrong (500)</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>
-  body {
-    background-color: #EFEFEF;
-    color: #2E2F30;
-    text-align: center;
-    font-family: arial, sans-serif;
-    margin: 0;
-  }
-
-  div.dialog {
-    width: 95%;
-    max-width: 33em;
-    margin: 4em auto 0;
-  }
-
-  div.dialog > div {
-    border: 1px solid #CCC;
-    border-right-color: #999;
-    border-left-color: #999;
-    border-bottom-color: #BBB;
-    border-top: #B00100 solid 4px;
-    border-top-left-radius: 9px;
-    border-top-right-radius: 9px;
-    background-color: white;
-    padding: 7px 12% 0;
-    box-shadow: 0 3px 8px rgba(50, 50, 50, 0.17);
-  }
-
-  h1 {
-    font-size: 100%;
-    color: #730E15;
-    line-height: 1.5em;
-  }
-
-  div.dialog > p {
-    margin: 0 0 1em;
-    padding: 1em;
-    background-color: #F7F7F7;
-    border: 1px solid #CCC;
-    border-right-color: #999;
-    border-left-color: #999;
-    border-bottom-color: #999;
-    border-bottom-left-radius: 4px;
-    border-bottom-right-radius: 4px;
-    border-top-color: #DADADA;
-    color: #666;
-    box-shadow: 0 3px 8px rgba(50, 50, 50, 0.17);
-  }
-  </style>
-</head>
-
-<body>
-  <!-- This file lives in public/500.html -->
-  <div class="dialog">
-    <div>
-      <h1>We're sorry, but something went wrong.</h1>
-    </div>
-    <p>If you are the application owner check the logs for more information.</p>
-  </div>
-</body>
-</html>
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Erro 500 — ImpulsoCore</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b1020" />
+    <link rel="icon" href="/brand-assets/logo_sem_fundo.png" type="image/png" />
+    <style>
+      /* Minimal, inline styles for static error page */
+      *,*::before,*::after{box-sizing:border-box}
+      html,body{height:100%}
+      body{margin:0;display:grid;place-items:center;background:#0b1020;color:#e5e7eb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Ubuntu,'Helvetica Neue',Arial}
+      .card{width:min(560px,92%);background:#0f162e;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:20px 20px 16px;box-shadow:0 20px 60px rgba(2,6,23,.45);text-align:center}
+      .brand{display:flex;justify-content:center;align-items:center;gap:.6rem;margin-bottom:.6rem;color:#a5f3fc;font-weight:800}
+      .brand img{width:42px;height:42px;border-radius:10px}
+      h1{margin:.4rem 0 .25rem;font-size:1.3rem;line-height:1.2}
+      p{margin:.25rem 0;color:#9ca3af}
+      .actions{display:flex;gap:.6rem;justify-content:center;margin-top:1rem;flex-wrap:wrap}
+      .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.75rem 1rem;border-radius:.75rem;color:#fff;text-decoration:none;background:linear-gradient(90deg,#22d3ee,#2563eb);box-shadow:0 10px 24px rgba(34,211,238,.15)}
+      .btn.secondary{background:#111827}
+      small{display:block;margin-top:.75rem;color:#6b7280}
+    </style>
+  </head>
+  <body>
+    <main class="card" role="main">
+      <div class="brand">
+        <img src="/brand-assets/logo.svg" alt="ImpulsoCore" /> ImpulsoCore
+      </div>
+      <h1>Ops! Algo deu errado (500)</h1>
+      <p>Tente novamente em alguns instantes. Se o problema persistir, fale com o suporte.</p>
+      <div class="actions">
+        <a class="btn" href="/">Voltar ao app</a>
+        <a class="btn secondary" href="https://wa.me/5511963998061" target="_blank" rel="noopener">Falar no WhatsApp</a>
+      </div>
+      <small>© ImpulsoCore</small>
+    </main>
+  </body>
+  </html>
