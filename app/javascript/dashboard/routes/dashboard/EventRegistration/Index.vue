@@ -1,116 +1,108 @@
 <template>
-  <div class="events-container">
+  <div class="events-container min-h-screen mx-auto w-full max-w-6xl p-5 text-n-slate-12">
     <!-- Cabeçalho -->
-    <div class="events-header">
-      <div class="events-title-wrap">
-        <h1 class="events-title">Agendamentos</h1>
-        <div class="stats">
-          <span class="stat-pill">Total: {{ schedules.length }}</span>
-          <span class="stat-pill stat-pill--ok">Ativos: {{ activeCount }}</span>
-          <span class="stat-pill stat-pill--muted">Inativos: {{ inactiveCount }}</span>
-        </div>
-      </div>
-      <div class="events-actions">
-        <button class="btn btn--secondary" @click="loadSchedules" :disabled="loading">
-          <span v-if="loading">Carregando...</span>
-          <span v-else>Recarregar</span>
-        </button>
-        <button class="btn btn--primary" @click="openCreateForm">Novo Agendamento</button>
-      </div>
-    </div>
-
-    <!-- Toolbar fixa: busca + filtros + ordenação -->
-    <div class="toolbar">
-      <div class="search-box">
-        <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
-        </svg>
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Buscar por nome, canal ou expressão..."
-          class="search-input"
-        />
-      </div>
-
-      <div class="segmented">
-        <div class="segmented__group" role="tablist" aria-label="Filtro de canal">
-          <button
-            v-for="opt in channelOptions"
-            :key="opt.value"
-            :class="['segmented__btn', { 'is-active': channelFilter === opt.value }]"
-            role="tab"
-            @click="channelFilter = opt.value"
-          >{{ opt.label }}</button>
-        </div>
-
-        <div class="segmented__group" role="tablist" aria-label="Filtro de status">
-          <button
-            v-for="opt in statusOptions"
-            :key="opt.value"
-            :class="['segmented__btn', { 'is-active': statusFilter === opt.value }]"
-            role="tab"
-            @click="statusFilter = opt.value"
-          >{{ opt.label }}</button>
-        </div>
-
-        <div class="sorter">
-          <label class="sorter__label">Ordenar</label>
-          <select v-model="sortKey" class="sorter__select">
-            <option value="name">Nome</option>
-            <option value="channel">Canal</option>
-            <option value="when">Quando</option>
-          </select>
-          <button class="btn btn--ghost btn--small" @click="toggleSortDir" :title="sortDir === 'asc' ? 'Ascendente' : 'Descendente'">
-            <span v-if="sortDir === 'asc'">▲</span>
-            <span v-else>▼</span>
-          </button>
-        </div>
+    <div class="events-header flex items-center justify-between gap-4 flex-wrap mb-6">
+      <h2 class="events-title text-xl font-medium text-n-accent" style="padding-left: 75px;">Agendamentos</h2>
+      <div class="events-actions flex items-center gap-2">
+        <Button faded slate @click="loadSchedules" :disabled="loading">
+          <template v-if="loading">Carregando...</template>
+          <template v-else>Recarregar</template>
+        </Button>
+        <Button @click="openCreateForm">Novo Agendamento</Button>
       </div>
     </div>
 
     <!-- Estado vazio -->
-    <div v-if="!loading && !readyList.length" class="empty-state">
-      <div class="empty-state__icon">⏱️</div>
-      <h2 class="empty-state__title">Nada por aqui…</h2>
-      <p class="empty-state__description">
-        Crie seu primeiro agendamento ou ajuste os filtros/busca.
+    <div
+      v-if="!loading && !readyList.length"
+      class="empty-state text-center rounded-xl outline outline-1 outline-n-container bg-n-solid-1 p-8"
+    >
+      <div class="empty-state__icon text-4xl mb-2">⏱️</div>
+      <h2 class="empty-state__title text-xl font-semibold mb-1" style="padding-left: 30px;">Sem agendamentos</h2>
+      <p class="empty-state__description text-n-slate-10 mb-6">
+        Crie seu primeiro agendamento.
       </p>
-      <div class="empty-actions">
-        <button class="btn btn--primary btn--large" @click="openCreateForm">Criar agendamento</button>
-        <button class="btn btn--secondary btn--large" @click="clearFilters">Limpar filtros</button>
-      </div>
+      <Button lg @click="openCreateForm">Criar</Button>
     </div>
 
     <!-- Lista -->
-    <div v-else-if="!loading" class="events-list">
-      <div class="events-grid">
+    <div v-else-if="!loading" class="events-list w-full" style="padding: 0 75px;">
+      <!-- Filtros / Busca -->
+      <div class="events-filters flex items-center justify-between gap-4 flex-wrap mb-5">
+        <div class="search-box flex-1 max-w-[420px]">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Buscar por nome, canal ou expressão..."
+            class="search-input w-full px-4 py-3 rounded-lg bg-n-background dark:bg-n-solid-1 text-n-slate-12 placeholder:text-n-slate-10 outline outline-1 outline-n-weak focus:outline-n-brand focus:ring-1 focus:ring-n-brand"
+          />
+        </div>
+
+        <div class="flex items-center gap-3 flex-wrap">
+          <!-- filtro canal -->
+          <div class="segmented inline-flex items-center gap-1 rounded-full bg-n-solid-1 outline outline-1 outline-n-container p-1">
+            <button
+              v-for="opt in channelOptions"
+              :key="opt.value"
+              class="segmented__btn px-3 py-1.5 text-xs rounded-full"
+              :class="channelFilter === opt.value ? 'bg-n-solid-2 text-n-slate-12' : 'text-n-slate-11 hover:bg-n-solid-2'"
+              @click="setChannel(opt.value)"
+            >{{ opt.label }}</button>
+          </div>
+
+          <!-- filtro status -->
+          <div class="segmented inline-flex items-center gap-1 rounded-full bg-n-solid-1 outline outline-1 outline-n-container p-1">
+            <button
+              v-for="opt in statusOptions"
+              :key="opt.value"
+              class="segmented__btn px-3 py-1.5 text-xs rounded-full"
+              :class="statusFilter === opt.value ? 'bg-n-solid-2 text-n-slate-12' : 'text-n-slate-11 hover:bg-n-solid-2'"
+              @click="setStatus(opt.value)"
+            >{{ opt.label }}</button>
+          </div>
+
+          <!-- legenda -->
+          <div class="legend flex items-center gap-4 text-xs text-n-slate-10">
+            <span class="legend-item inline-flex items-center gap-2">
+              <span class="status-dot w-2 h-2 rounded-full bg-n-teal-9"></span>
+              Ativo
+            </span>
+            <span class="legend-item inline-flex items-center gap-2">
+              <span class="status-dot w-2 h-2 rounded-full bg-n-slate-9"></span>
+              Inativo
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="events-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
         <div
           v-for="it in pagedList"
           :key="it.eventId"
-          class="event-card"
-          :class="{ 'event-card--inactive': !it.enabled }"
+          class="event-card rounded-xl outline outline-1 outline-n-container bg-n-solid-1 shadow transition hover:shadow-lg"
+          :class="{ 'opacity-75': !it.enabled }"
         >
           <!-- Header do card -->
-          <div class="event-card__header">
-            <div class="event-card__title-section">
-              <h3 class="event-card__title" :title="it.eventId">{{ it.eventId }}</h3>
-              <div class="event-card__meta">
+          <div class="event-card__header flex justify-between items-start p-5 border-b border-n-weak bg-n-solid-2">
+            <div class="event-card__title-section min-w-0">
+              <h3 class="event-card__title text-base font-semibold mb-2 truncate" :title="it.eventId">{{ it.eventId }}</h3>
+              <div class="flex gap-2 items-center">
                 <span
-                  class="event-card__status"
-                  :class="it.enabled ? 'event-card__status--active' : 'event-card__status--inactive'"
+                  class="event-card__status text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                  :class="it.enabled ? 'bg-n-teal-1 text-n-teal-11' : 'bg-n-slate-3 text-n-slate-10'"
                 >
                   {{ it.enabled ? 'Habilitado' : 'Desabilitado' }}
                 </span>
-                <span class="pill" :title="it.channel">
+                <span class="pill text-[11px] px-2 py-0.5 rounded-full outline outline-1 outline-n-weak" :title="it.channel">
                   {{ it.channel === 'email' ? 'Email' : 'WhatsApp' }}
                 </span>
               </div>
             </div>
 
-            <div class="event-card__actions">
-              <button
-                class="btn btn--small btn--ghost"
+            <div class="event-card__actions flex items-center gap-2">
+              <Button
+                sm ghost slate
                 @click="toggleEnabled(it)"
                 :disabled="togglingId === it.eventId"
                 :title="it.enabled ? 'Desabilitar' : 'Habilitar'"
@@ -125,48 +117,48 @@
                     <path d="M16.6582 9.28638C18.098 10.1862 18.8178 10.6361 19.0647 11.2122C19.2803 11.7152 19.2803 12.2847 19.0647 12.7878C18.8178 13.3638 18.098 13.8137 16.6582 14.7136L9.896 18.94C8.29805 19.9387 7.49907 20.4381 6.83973 20.385C6.26501 20.3388 5.73818 20.0469 5.3944 19.584C5 19.053 5 18.1108 5 16.2264V7.77357C5 5.88919 5 4.94701 5.3944 4.41598C5.73818 3.9531 6.26501 3.66111 6.83973 3.6149C7.49907 3.5619 8.29805 4.06126 9.896 5.05998L16.6582 9.28638Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                   </svg>
                 </template>
-              </button>
+              </Button>
 
-              <button class="btn btn--small btn--ghost" @click="editSchedule(it)" title="Editar">
+              <Button sm ghost slate title="Editar" @click="editSchedule(it)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M21.28 6.4L11.74 15.94c-.95.95-3.77 1.39-4.4.76-.63-.63-.2-3.45.75-4.39l9.55-9.55a3.2 3.2 0 0 1 4.53 4.53Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  <path d="M11 4H6a4 4 0 0 0-4 4v10a4 4 0 0 0 4 4h11c2.21 0 3-1.8 3-4v-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M21.2799 6.40005L11.7399 15.94C10.7899 16.89 7.96987 17.33 7.33987 16.7C6.70987 16.07 7.13987 13.25 8.08987 12.3L17.6399 2.75002C17.8754 2.49308 18.1605 2.28654 18.4781 2.14284C18.7956 1.99914 19.139 1.92124 19.4875 1.9139C19.8359 1.90657 20.1823 1.96991 20.5056 2.10012C20.8289 2.23033 21.1225 2.42473 21.3686 2.67153C21.6147 2.91833 21.8083 3.21243 21.9376 3.53609C22.0669 3.85976 22.1294 4.20626 22.1211 4.55471C22.1128 4.90316 22.0339 5.24635 21.8894 5.5635C21.7448 5.88065 21.5375 6.16524 21.2799 6.40005V6.40005Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M11 4H6C4.93913 4 3.92178 4.42142 3.17163 5.17157C2.42149 5.92172 2 6.93913 2 8V18C2 19.0609 2.42149 20.0783 3.17163 20.8284C3.92178 21.5786 4.93913 22 6 22H17C19.21 22 20 20.2 20 18V13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-              </button>
+              </Button>
 
-              <button class="btn btn--small btn--ghost btn--danger" @click="confirmDelete(it)" title="Excluir">
+              <Button sm ghost ruby title="Excluir" @click="confirmDelete(it)" :disabled="deletingId === it.eventId">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 3L21 21M18 6L17.6 12M17.25 17.25l-.05.76c-.07 1.05-.1 1.58-.33 1.98-.2.35-.5.63-.86.81-.42.2-.95.2-2 .2H10c-1.06 0-1.59 0-2-.2a1.98 1.98 0 0 1-.86-.81c-.23-.4-.26-.93-.32-1.98L6 6H4M16 6l-.54-1.63A2 2 0 0 0 13.56 3h-3.12M11.61 6H20M14 14v3M10 10v7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M3 3L21 21M18 6L17.6 12M17.2498 17.2527L17.1991 18.0129C17.129 19.065 17.0939 19.5911 16.8667 19.99C16.6666 20.3412 16.3648 20.6235 16.0011 20.7998C15.588 21 15.0607 21 14.0062 21H9.99377C8.93927 21 8.41202 21 7.99889 20.7998C7.63517 20.6235 7.33339 20.3412 7.13332 19.99C6.90607 19.5911 6.871 19.065 6.80086 18.0129L6 6H4M16 6L15.4559 4.36754C15.1837 3.55086 14.4194 3 13.5585 3H10.4416C9.94243 3 9.47576 3.18519 9.11865 3.5M11.6133 6H20M14 14V17M10 10V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-              </button>
+              </Button>
             </div>
           </div>
 
           <!-- Conteúdo -->
-          <div class="event-card__content">
-            <div class="event-info">
-              <div class="event-info__item">
-                <label class="event-info__label">Modelo:</label>
-                <span class="event-info__value">{{ it.runAt ? 'Pontual (at)' : 'Recorrente (cron)' }}</span>
+          <div class="event-card__content p-5">
+            <div class="event-info mb-4">
+              <div class="event-info__item flex items-baseline mb-2">
+                <label class="event-info__label min-w-[120px] text-sm font-medium text-n-slate-10">Modelo:</label>
+                <span class="event-info__value text-sm">{{ it.runAt ? 'Pontual (at)' : 'Recorrente (cron)' }}</span>
               </div>
 
-              <div class="event-info__item" v-if="!it.runAt">
-                <label class="event-info__label">Quando:</label>
-                <span class="event-info__value">{{ humanRecurring(it) }}</span>
+              <div class="event-info__item flex items-baseline mb-2" v-if="!it.runAt">
+                <label class="event-info__label min-w-[120px] text-sm font-medium text-n-slate-10">Quando:</label>
+                <span class="event-info__value text-sm">{{ humanRecurring(it) }}</span>
               </div>
-              <div class="event-info__item" v-else>
-                <label class="event-info__label">Executar em:</label>
-                <span class="event-info__value">{{ formatDateTime(it.runAt) }}</span>
-              </div>
-
-              <div class="event-info__item">
-                <label class="event-info__label">Expressão:</label>
-                <span class="event-info__value font-mono cut">{{ it.scheduleExpression || '—' }}</span>
+              <div class="event-info__item flex items-baseline mb-2" v-else>
+                <label class="event-info__label min-w-[120px] text-sm font-medium text-n-slate-10">Executar em:</label>
+                <span class="event-info__value text-sm">{{ formatDateTime(it.runAt) }}</span>
               </div>
 
-              <div class="event-info__item">
-                <label class="event-info__label">Vigência:</label>
-                <span class="event-info__value">
+              <div class="event-info__item flex items-baseline mb-2">
+                <label class="event-info__label min-w-[120px] text-sm font-medium text-n-slate-10">Expressão:</label>
+                <span class="event-info__value text-sm font-mono">{{ it.scheduleExpression || '—' }}</span>
+              </div>
+
+              <div class="event-info__item flex items-baseline mb-2">
+                <label class="event-info__label min-w-[120px] text-sm font-medium text-n-slate-10">Vigência:</label>
+                <span class="event-info__value text-sm">
                   <template v-if="it.startAt || it.endAt">
                     {{ it.startAt ? formatDateTime(it.startAt) : '—' }} — {{ it.endAt ? formatDateTime(it.endAt) : '—' }}
                   </template>
@@ -174,97 +166,83 @@
                 </span>
               </div>
 
-              <div class="event-info__item" v-if="it.channel==='whatsapp'">
-                <label class="event-info__label">Agente:</label>
-                <span class="event-info__value cut">{{ it.agent || '—' }}</span>
-              </div>
-
-              <div class="event-info__item">
-                <label class="event-info__label">Destinatários:</label>
-                <span class="event-info__value">{{ it.recipients.length }}</span>
+              <div class="event-info__item flex items-baseline">
+                <label class="event-info__label min-w-[120px] text-sm font-medium text-n-slate-10">Destinatários:</label>
+                <span class="event-info__value text-sm">{{ it.recipients.length }}</span>
               </div>
             </div>
 
-            <button
-              class="clients-toggle"
-              @click="toggleRecipients(it.eventId)"
+            <Button
               v-if="it.recipients.length"
+              ghost
+              slate
+              class="w-full justify-start"
+              @click="toggleRecipients(it.eventId)"
             >
-              <span class="chev" :class="{ 'chev--open': expanded.includes(it.eventId) }">▸</span>
+              <span class="mr-2">{{ expanded.includes(it.eventId) ? '▼' : '▶' }}</span>
               {{ expanded.includes(it.eventId) ? 'Ocultar' : 'Ver' }} destinatários
-            </button>
+            </Button>
 
-            <div v-if="expanded.includes(it.eventId)" class="clients-list">
-              <div class="clients-grid">
-                <div v-for="(r, idx) in it.recipients" :key="idx" class="client-card">
+            <div v-if="expanded.includes(it.eventId)" class="clients-list mt-4 border-t border-n-weak pt-4">
+              <div class="clients-grid flex flex-col gap-2">
+                <div
+                  v-for="(r, idx) in it.recipients"
+                  :key="idx"
+                  class="client-card flex items-center justify-between p-3 rounded-lg outline outline-1 outline-n-container bg-n-solid-1"
+                >
                   <div class="client-info">
-                    <div class="client-name">{{ r.name || '(sem nome)' }}</div>
-                    <div class="client-phone">
+                    <div class="client-name text-sm font-medium">{{ r.name || '(sem nome)' }}</div>
+                    <div class="client-phone text-xs text-n-slate-10">
                       <template v-if="it.channel === 'email'">{{ r.email }}</template>
                       <template v-else>{{ r.phone }}</template>
                     </div>
                   </div>
                   <div class="client-actions">
-                    <button class="btn btn--tiny btn--ghost" @click="previewMessage(it, r)">Prévia</button>
+                    <Button xs ghost slate @click="previewMessage(it, r)">Prévia</Button>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </div> <!-- /content -->
         </div>
       </div>
 
       <!-- Paginação -->
-      <div class="pagination" v-if="totalPages > 1 || pageSizeOptions.length">
-        <div class="pagination__left">
-          <label class="pagination__label">Itens por página</label>
-          <select v-model.number="pageSize" class="pagination__select">
-            <option v-for="n in pageSizeOptions" :key="n" :value="n">{{ n }}</option>
-          </select>
-        </div>
-
-        <div class="pagination__center">
-          <button class="btn btn--small btn--ghost" @click="goFirst" :disabled="currentPage <= 1">«</button>
-          <button class="btn btn--small btn--ghost" @click="currentPage--" :disabled="currentPage <= 1">←</button>
-          <span class="pagination-info">Página {{ currentPage }} de {{ totalPages }}</span>
-          <button class="btn btn--small btn--ghost" @click="currentPage++" :disabled="currentPage >= totalPages">→</button>
-          <button class="btn btn--small btn--ghost" @click="goLast" :disabled="currentPage >= totalPages">»</button>
-        </div>
-
-        <div class="pagination__right">
-          <span class="pagination-info">{{ readyList.length }} resultado(s)</span>
-        </div>
+      <div v-if="totalPages > 1" class="pagination flex justify-center items-center gap-4 mt-8">
+        <Button sm ghost slate @click="prevPage" :disabled="currentPage <= 1">← Anterior</Button>
+        <span class="pagination-info text-sm text-n-slate-10">Página {{ currentPage }} de {{ totalPages }}</span>
+        <Button sm ghost slate @click="nextPage" :disabled="currentPage >= totalPages">Próxima →</Button>
       </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="loading-state">
-      <div class="loading-spinner"></div>
+    <div v-if="loading" class="loading-state text-center py-16 text-n-slate-10">
+      <div class="w-8 h-8 border-2 border-n-weak border-t-n-brand rounded-full animate-spin mx-auto mb-4"></div>
       <p>Carregando agendamentos...</p>
     </div>
 
     <!-- Modal principal (criar/editar) -->
-    <div v-if="showForm" class="modal-overlay" @click.self="closeForm">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="modal-title">{{ selected ? 'Editar Agendamento' : 'Novo Agendamento' }}</h2>
-          <button class="btn btn--ghost btn--small modal-close" @click="closeForm">✕</button>
+    <div v-if="showForm" class="modal-overlay fixed inset-0 bg-black/70 grid place-items-center z-[1000] p-5" @click.self="closeForm">
+      <div class="modal-content bg-n-solid-1 rounded-xl outline outline-1 outline-n-container shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        <div class="modal-header flex justify-between items-center p-5 border-b border-n-weak bg-n-solid-2">
+          <h2 class="modal-title text-lg font-semibold">{{ selected ? 'Editar Agendamento' : 'Novo Agendamento' }}</h2>
+          <Button sm ghost slate class="modal-close" @click="closeForm">✕</Button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body max-h-[calc(90vh-80px)] overflow-y-auto p-4">
           <EventForm :value="selected" @saved="handleSaved" />
         </div>
       </div>
     </div>
 
     <!-- Modal de prévia -->
-    <div v-if="preview.open" class="modal-overlay" @click.self="closePreview">
-      <div class="modal-content modal-content--sm">
-        <div class="modal-header">
-          <h2 class="modal-title">Prévia</h2>
-          <button class="btn btn--ghost btn--small modal-close" @click="closePreview">✕</button>
+    <div v-if="preview.open" class="modal-overlay fixed inset-0 bg-black/70 grid place-items-center z-[1100] p-5" @click.self="closePreview">
+      <div class="modal-content bg-n-solid-1 rounded-xl outline outline-1 outline-n-container shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+        <div class="modal-header flex justify-between items-center p-4 border-b border-n-weak bg-n-solid-2">
+          <h2 class="modal-title text-base font-semibold">Prévia</h2>
+          <Button sm ghost slate class="modal-close" @click="closePreview">✕</Button>
         </div>
-        <div class="modal-body">
-          <pre class="preview-box">{{ preview.text }}</pre>
+        <div class="modal-body p-4">
+          <pre class="preview-box whitespace-pre-wrap text-sm text-n-slate-12 bg-n-solid-1 outline outline-1 outline-n-container rounded-lg p-3">{{ preview.text }}</pre>
         </div>
       </div>
     </div>
@@ -274,6 +252,7 @@
 <script>
 import axios from 'axios'
 import EventForm from './EventForm.vue'
+import Button from 'dashboard/components-next/button/Button.vue'
 
 const API_BASE = 'https://f4wzfjousg.execute-api.us-east-1.amazonaws.com/schedules'
 const tz = 'America/Sao_Paulo'
@@ -295,7 +274,7 @@ function fmtDateTime(d) {
 
 export default {
   name: 'SchedulesIndex',
-  components: { EventForm },
+  components: { EventForm, Button },
   data() {
     return {
       api: axios.create({ baseURL: API_BASE }),
@@ -305,16 +284,11 @@ export default {
       selected: null,
       togglingId: null,
       deletingId: null,
+
+      // filtros / busca / paginação
       searchQuery: '',
-      channelFilter: 'all',
-      statusFilter: 'all',
-      sortKey: 'name',
-      sortDir: 'asc',
-      expanded: [],
-      currentPage: 1,
-      pageSize: 6,
-      pageSizeOptions: [6, 12, 24, 48],
-      preview: { open: false, text: '' },
+      channelFilter: 'all', // all | whatsapp | email
+      statusFilter: 'all',  // all | enabled | disabled
       channelOptions: [
         { value: 'all', label: 'Todos' },
         { value: 'whatsapp', label: 'WhatsApp' },
@@ -325,26 +299,28 @@ export default {
         { value: 'enabled', label: 'Ativos' },
         { value: 'disabled', label: 'Inativos' }
       ],
+      expanded: [],
+      currentPage: 1,
+      pageSize: 6,
+
+      // prévia
+      preview: { open: false, text: '' },
     }
   },
   computed: {
-    activeCount() { return this.schedules.filter(s => s.enabled).length },
-    inactiveCount() { return this.schedules.filter(s => !s.enabled).length },
-
     readyList() {
-      // base
       let list = this.schedules.slice()
 
-      // filtros
+      // filtro por canal
       if (this.channelFilter !== 'all') {
         list = list.filter(it => (it.channel || '').toLowerCase() === this.channelFilter)
       }
+      // filtro por status
       if (this.statusFilter !== 'all') {
         const want = this.statusFilter === 'enabled'
         list = list.filter(it => !!it.enabled === want)
       }
-
-      // busca
+      // busca textual
       const q = this.searchQuery.trim().toLowerCase()
       if (q) {
         list = list.filter(it =>
@@ -353,77 +329,70 @@ export default {
           (it.scheduleExpression || '').toLowerCase().includes(q)
         )
       }
-
-      // ordenação
-      const dir = this.sortDir === 'asc' ? 1 : -1
-      list.sort((a, b) => {
-        if (this.sortKey === 'channel') {
-          return (a.channel || '').localeCompare(b.channel || '') * dir
-        }
-        if (this.sortKey === 'when') {
-          // tenta ordenar por runAt; se recorrente, usa time (HH:mm)
-          const av = a.runAt ? a.runAt : (a.time || '')
-          const bv = b.runAt ? b.runAt : (b.time || '')
-          return String(av).localeCompare(String(bv)) * dir
-        }
-        // default: nome
-        return (a.eventId || '').localeCompare(b.eventId || '') * dir
-      })
-
       return list
     },
-
-    totalPages() { return Math.max(1, Math.ceil(this.readyList.length / this.pageSize)) },
-
+    totalPages() {
+      return Math.max(1, Math.ceil(this.readyList.length / this.pageSize))
+    },
     pagedList() {
       const start = (this.currentPage - 1) * this.pageSize
       return this.readyList.slice(start, start + this.pageSize)
+    }
+  },
+  watch: {
+    searchQuery() { this.currentPage = 1 },
+    channelFilter() { this.currentPage = 1 },
+    statusFilter() { this.currentPage = 1 },
+    readyList(newList) {
+      const max = Math.max(1, Math.ceil(newList.length / this.pageSize))
+      if (this.currentPage > max) this.currentPage = max
     }
   },
   mounted() {
     this.loadSchedules()
     window.addEventListener('keydown', this.onKeydown)
   },
-  beforeUnmount() { window.removeEventListener('keydown', this.onKeydown) },
-  watch: {
-    searchQuery() { this.currentPage = 1 },
-    channelFilter() { this.currentPage = 1 },
-    statusFilter() { this.currentPage = 1 },
-    pageSize() { this.currentPage = 1 },
-    readyList(newList) {
-      // se a página atual ficou além do fim, volta
-      const maxPage = Math.max(1, Math.ceil(newList.length / this.pageSize))
-      if (this.currentPage > maxPage) this.currentPage = maxPage
-    }
+  beforeUnmount() {
+    window.removeEventListener('keydown', this.onKeydown)
   },
   methods: {
-    onKeydown(e) { if (e.key === 'Escape') { if (this.showForm) this.closeForm(); if (this.preview.open) this.closePreview() } },
+    onKeydown(e) {
+      if (e.key === 'Escape') {
+        if (this.showForm) this.closeForm()
+        if (this.preview.open) this.closePreview()
+      }
+    },
+    setChannel(v) { this.channelFilter = v },
+    setStatus(v) { this.statusFilter = v },
+
     openCreateForm() { this.selected = null; this.showForm = true },
     closeForm() { this.showForm = false; this.selected = null },
-    clearFilters() { this.searchQuery = ''; this.channelFilter = 'all'; this.statusFilter = 'all' },
-    toggleSortDir() { this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc' },
-    goFirst() { this.currentPage = 1 },
-    goLast() { this.currentPage = this.totalPages },
+
+    prevPage() { if (this.currentPage > 1) this.currentPage-- },
+    nextPage() { if (this.currentPage < this.totalPages) this.currentPage++ },
+
     formatDateTime: fmtDateTime,
     humanRecurring(it) {
-      const DOW_LABEL = { SUN: 'Dom', MON: 'Seg', TUE: 'Ter', WED: 'Qua', THU: 'Qui', FRI: 'Sex', SAT: 'Sáb' }
       const days = (it.daysOfWeek || []).map(d => DOW_LABEL[d] || d).join(', ')
       const time = it.time || '—'
       const tzs = it.timezone || 'America/Sao_Paulo'
       return days ? `${days} às ${time} (${tzs})` : '—'
     },
+
     toggleRecipients(id) {
       const i = this.expanded.indexOf(id)
-      if (i > -1) this.expanded.splice(i, 1); else this.expanded.push(id)
+      if (i > -1) this.expanded.splice(i, 1)
+      else this.expanded.push(id)
     },
+
     dayKeyFor(timezone) {
       try {
         const now = new Date()
         const fmt = new Intl.DateTimeFormat('en-US', { timeZone: timezone || 'UTC', weekday: 'short' })
-        const k = fmt.format(now).toUpperCase().slice(0,3)
-        return k
+        return fmt.format(now).toUpperCase().slice(0,3) // MON/TUE/WED...
       } catch { return 'MON' }
     },
+
     renderTemplate(tpl, vars) {
       if (!tpl) return ''
       const v = { ...(vars || {}) }
@@ -431,6 +400,7 @@ export default {
       if (v.nome && !v.name) v.name = v.nome
       return tpl.replace(/\{\{\s*([a-zA-Z0-9_\-\.]+)\s*\}\}/g, (_, k) => (v[k] ?? ''))
     },
+
     previewMessage(it, r) {
       const chan = it.channel
       let preview = ''
@@ -444,11 +414,11 @@ export default {
         const byDay = it.payload?.messagesByDay || {}
         const base = it.payload?.message || ''
         const chosen = byDay[k] || base
-        const msg = this.renderTemplate(chosen || '', varsMap)
-        preview = msg
+        preview = this.renderTemplate(chosen || '', varsMap)
       }
       this.preview = { open: true, text: preview || '(sem conteúdo)' }
     },
+
     closePreview() { this.preview = { open: false, text: '' } },
 
     async loadSchedules() {
@@ -477,7 +447,9 @@ export default {
       } catch (e) {
         console.error('Falha ao carregar:', e)
         this.schedules = []
-      } finally { this.loading = false }
+      } finally {
+        this.loading = false
+      }
     },
 
     editSchedule(it) {
@@ -508,7 +480,9 @@ export default {
       } catch (e) {
         console.error('Erro ao alternar enabled:', e)
         alert('Não foi possível atualizar o status.')
-      } finally { this.togglingId = null }
+      } finally {
+        this.togglingId = null
+      }
     },
 
     async confirmDelete(it) {
@@ -522,7 +496,9 @@ export default {
       } catch (e) {
         console.error('Erro ao excluir:', e)
         alert('Falha ao excluir.')
-      } finally { this.deletingId = null }
+      } finally {
+        this.deletingId = null
+      }
     },
 
     handleSaved() {
@@ -535,220 +511,4 @@ export default {
 </script>
 
 <style scoped>
-/* ----- Base ----- */
-.events-container{
-  /* offset do header fixo do seu app (ajuste se precisar: 56/64/72px) */
-  --app-header-offset: 64px;
-
-  min-height: 100vh;
-  width: 100%;
-  max-width: none;        /* evita ser comprimido pelo pai flex */
-  margin: 0;              /* neutraliza o "empurrão" do auto dentro de flex */
-  padding: 20px clamp(12px, 2vw, 24px);
-
-  background: #1a1a1a;
-  color: #e5e5e5;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-.font-mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-
-/* ----- Header ----- */
-.events-header{
-  display:flex; justify-content:space-between; align-items:center;
-  margin-bottom:10px; flex-wrap:wrap; gap:16px;
-}
-.events-title-wrap{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
-.events-title{ font-size:26px; font-weight:800; margin:0; color:#fff; }
-.stats{ display:flex; gap:8px; flex-wrap:wrap; }
-.stat-pill{ padding:4px 10px; border-radius:999px; border:1px solid #333; background:#242424; font-size:12px; color:#d6d6d6; }
-.stat-pill--ok{ border-color:#0f5132; background:#0b2e22; color:#10b981; }
-.stat-pill--muted{ color:#9ca3af; }
-
-/* ----- Actions ----- */
-.events-actions{ display:flex; gap:12px; }
-
-/* ----- Toolbar fixa ----- */
-.toolbar{
-  position: sticky;
-  top: var(--app-header-offset);
-  z-index: 10;
-
-  display:grid; grid-template-columns: 1.2fr auto auto; gap:12px;
-  align-items:center; padding:12px 0 14px; margin-bottom:12px;
-  background: linear-gradient(180deg, rgba(26,26,26,.95), rgba(26,26,26,.85) 60%, rgba(26,26,26,0) 100%);
-  backdrop-filter: blur(4px);
-  border-bottom:1px solid #2a2a2a;
-}
-/* se a viewport for baixa, desgruda a toolbar pra não esmagar conteúdo */
-@media (max-height: 720px){
-  .toolbar{ position: static; }
-}
-
-.search-box{ position:relative; }
-.search-icon{
-  position:absolute; left:12px; top:50%; transform:translateY(-50%);
-  width:18px; height:18px; color:#8a8a8a; pointer-events:none;
-}
-.search-input{
-  width:100%; padding:12px 14px 12px 38px; border:1px solid #333; border-radius:10px;
-  font-size:14px; background:#232323; color:#e5e5e5;
-}
-.search-input:focus{ outline:none; border-color:#4f9cf9; box-shadow:0 0 0 1px #4f9cf9; }
-.search-input::placeholder{ color:#808080; }
-
-.segmented{ display:flex; gap:12px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
-.segmented__group{ display:inline-flex; background:#222; border:1px solid #333; border-radius:999px; padding:3px; }
-.segmented__btn{
-  padding:6px 10px; font-size:12px; color:#bdbdbd; background:transparent; border:0;
-  border-radius:999px; cursor:pointer; transition:.15s;
-}
-.segmented__btn:hover{ color:#fff; background:#2b2b2b; }
-.segmented__btn.is-active{ color:#fff; background:#3a3a3a; }
-
-.sorter{ display:inline-flex; gap:8px; align-items:center; flex-wrap:nowrap; }
-.sorter__label{ font-size:12px; color:#a0a0a0; }
-.sorter__select{
-  -webkit-appearance:none; -moz-appearance:none; appearance:none;
-  padding:8px 28px 8px 10px; border:1px solid #333; border-radius:8px;
-  background:#232323; color:#e5e5e5; font-size:12px;
-  background-image:
-    linear-gradient(45deg, transparent 50%, #9aa0a6 50%),
-    linear-gradient(135deg, #9aa0a6 50%, transparent 50%);
-  background-repeat:no-repeat; background-size:6px 6px, 6px 6px;
-  background-position:right 10px center, right 6px center;
-}
-
-/* ----- Lista / Grid ----- */
-/* centraliza somente o conteúdo rolável, não o container inteiro */
-.events-list{ width:100%; max-width:1200px; margin-inline:auto; }
-
-.events-grid{
-  display:grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); /* auto-fill evita "buraco" à esquerda */
-  gap:16px; margin-bottom:24px;
-  align-items:stretch; justify-items:stretch;
-}
-.event-card{
-  width:100%;
-  background:#232323; border:1px solid #323232; border-radius:14px; overflow:hidden;
-  transition:border-color .2s, transform .2s, box-shadow .2s;
-}
-.event-card:hover{ border-color:#4a4a4a; transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.25); }
-.event-card--inactive{ opacity:.85; }
-.event-card__header{
-  display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
-  padding:16px; border-bottom:1px solid #2f2f2f; background:#2b2b2b;
-}
-.event-card__title-section{ display:grid; gap:6px; min-width:0; }
-.event-card__title{ font-size:18px; font-weight:700; margin:0; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.event-card__meta{ display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.pill{ padding:2px 8px; border-radius:999px; border:1px solid #3a3a3a; font-size:12px; color:#d6d6d6; background:#262626; }
-.event-card__status{ font-size:12px; font-weight:600; padding:4px 8px; border-radius:999px; }
-.event-card__status--active{ background:#0b2e22; color:#10b981; border:1px solid #0f5132; }
-.event-card__status--inactive{ background:#2f3136; color:#9ca3af; border:1px solid #3a3a3a; }
-.event-card__actions{ display:inline-flex; gap:8px; }
-
-.event-card__content{ padding:16px; }
-.event-info{ display:grid; gap:8px; margin-bottom:12px; }
-.event-info__item{ display:grid; grid-template-columns: 140px 1fr; gap:10px; align-items:baseline; }
-.event-info__label{ font-weight:500; color:#a0a0a0; font-size:13px; }
-.event-info__value{ color:#e5e5e5; font-size:14px; }
-.cut{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-
-/* Destinatários */
-.clients-toggle{
-  display:inline-flex; align-items:center; gap:8px;
-  background:#2b2b2b; border:1px solid #3a3a3a; border-radius:8px;
-  padding:8px 12px; font-size:12px; color:#c9c9c9; cursor:pointer;
-}
-.clients-toggle:hover{ background:#333; color:#fff; }
-.chev{ display:inline-block; transition:transform .2s; }
-.chev--open{ transform:rotate(90deg); }
-
-.clients-list{ margin-top:14px; border-top:1px solid #2f2f2f; padding-top:12px; }
-.clients-grid{ display:flex; flex-direction:column; gap:8px; }
-.client-card{
-  display:flex; justify-content:space-between; align-items:center;
-  padding:10px 12px; background:#1f1f1f; border:1px solid #2d2d2d; border-radius:10px;
-}
-.client-name{ font-weight:600; color:#fff; font-size:14px; }
-.client-phone{ color:#a0a0a0; font-size:12px; }
-
-/* Paginação */
-.pagination{
-  display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:center;
-  margin-top:8px; padding:10px 0; border-top:1px solid #2a2a2a;
-}
-.pagination__left, .pagination__center, .pagination__right{ display:flex; align-items:center; gap:8px; }
-.pagination__left{ justify-content:flex-start; }
-.pagination__center{ justify-content:center; }
-.pagination__right{ justify-content:flex-end; }
-.pagination__label{ font-size:12px; color:#a0a0a0; }
-.pagination__select{
-  -webkit-appearance:none; -moz-appearance:none; appearance:none;
-  padding:8px 28px 8px 10px; border:1px solid #333; border-radius:8px;
-  background:#232323; color:#e5e5e5; font-size:12px;
-  background-image:
-    linear-gradient(45deg, transparent 50%, #9aa0a6 50%),
-    linear-gradient(135deg, #9aa0a6 50%, transparent 50%);
-  background-repeat:no-repeat; background-size:6px 6px, 6px 6px;
-  background-position:right 10px center, right 6px center;
-}
-.pagination-info{ font-size:13px; color:#a0a0a0; }
-
-/* Empty / Loading */
-.empty-state{
-  text-align:center; padding:64px 24px; background:#232323; border-radius:14px; border:1px solid #323232;
-}
-.empty-state__icon{ font-size:64px; margin-bottom:16px; }
-.empty-state__title{ font-size:22px; font-weight:700; margin:0 0 8px 0; color:#fff; }
-.empty-state__description{ font-size:15px; color:#a0a0a0; margin:0 0 24px 0; }
-.empty-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
-
-.loading-state{ text-align:center; padding:64px; color:#a0a0a0; }
-.loading-spinner{ width:32px; height:32px; border:3px solid #3a3a3a; border-top-color:#4f9cf9; border-radius:50%; animation: spin 1s linear infinite; margin:0 auto 16px; }
-@keyframes spin{ to{ transform: rotate(360deg); } }
-
-/* Modal(s) */
-.modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px; }
-.modal-content{ background:#2a2a2a; border-radius:12px; border:1px solid #3a3a3a; box-shadow:0 20px 25px -5px rgba(0,0,0,.3); width:100%; max-width:980px; max-height:90vh; overflow:hidden; }
-.modal-content--sm{ max-width:640px; }
-.modal-header{ display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #3a3a3a; background:#333; }
-.modal-title{ font-size:18px; font-weight:700; margin:0; color:#fff; }
-.modal-body{ max-height: calc(90vh - 80px); overflow-y:auto; padding:16px; }
-.preview-box{
-  white-space:pre-wrap; background:#1f1f1f; color:#e5e5e5; border:1px solid #343434;
-  border-radius:10px; padding:12px; font-size:14px; line-height:1.45;
-}
-
-/* Buttons */
-.btn{ display:inline-flex; align-items:center; justify-content:center; padding:8px 16px; font-size:14px; font-weight:600; border-radius:10px; border:none; cursor:pointer; transition:all .15s; text-decoration:none; white-space:nowrap; }
-.btn:disabled{ opacity:.6; cursor:not-allowed; }
-.btn--primary{ background:#4f9cf9; color:#fff; box-shadow:0 6px 14px rgba(79,156,249,.22); }
-.btn--primary:hover:not(:disabled){ background:#3b82f6; transform: translateY(-1px); }
-.btn--secondary{ background:#2a2a2a; color:#e5e5e5; border:1px solid #3a3a3a; }
-.btn--secondary:hover:not(:disabled){ background:#333; }
-.btn--ghost{ background:transparent; color:#bdbdbd; border:1px solid transparent; }
-.btn--ghost:hover:not(:disabled){ background:#333; color:#fff; }
-.btn--danger:hover:not(:disabled){ color:#ef4444; }
-.btn--small{ padding:6px 12px; font-size:12px; }
-.btn--tiny{ padding:4px 8px; font-size:11px; }
-.btn--large{ padding:12px 24px; font-size:16px; }
-
-/* Responsivo */
-@media (max-width: 900px){
-  .toolbar{ grid-template-columns:1fr; row-gap:10px; }
-  .segmented{ justify-content:space-between; }
-}
-@media (max-width: 768px){
-  .events-container{ padding:16px; }
-  .events-header{ flex-direction:column; align-items:stretch; }
-  .events-actions{ width:100%; }
-  .events-actions .btn{ flex:1; }
-  .events-grid{ grid-template-columns:1fr; }
-  .event-card__header{ flex-direction:column; gap:10px; align-items:stretch; }
-  .event-card__actions{ justify-content:stretch; }
-  .event-card__actions .btn{ flex:1; }
-  .event-info__item{ grid-template-columns:120px 1fr; }
-}
 </style>

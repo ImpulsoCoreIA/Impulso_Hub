@@ -1,22 +1,22 @@
 <template>
-  <div class="event-registration">
+  <div class="event-registration text-n-slate-12">
     <div class="event-registration__header">
-      <h1 class="event-registration__title">
+      <h1 class="event-registration__title text-n-slate-12">
         {{ isEdit ? 'Editar Agendamento' : 'Novo Agendamento' }}
       </h1>
-      <p class="event-registration__description">
+      <p class="event-registration__description text-n-slate-10">
         Configure envio automático por WhatsApp ou Email (SES)
       </p>
     </div>
 
     <div class="event-registration__content">
-      <form @submit.prevent="submit" class="event-form">
+      <form @submit.prevent="submit" class="event-form bg-n-solid-1 border-n-container">
         <!-- bloco 1: nome/canal -->
         <div class="grid two-cols">
           <div class="event-form__group">
-            <label class="event-form__label">Nome (único)</label>
+            <label class="event-form__label text-n-slate-11">Nome (único)</label>
             <input
-              class="event-form__input"
+              class="event-form__input text-n-slate-12"
               v-model.trim="form.name"
               :disabled="isEdit"
               placeholder="boas-vindas"
@@ -25,8 +25,8 @@
           </div>
 
           <div class="event-form__group">
-            <label class="event-form__label">Canal</label>
-            <select class="event-form__input" v-model="form.channel">
+            <label class="event-form__label text-n-slate-11">Canal</label>
+            <select class="event-form__input text-n-slate-12" v-model="form.channel">
               <option value="whatsapp">WhatsApp</option>
               <option value="email">Email (SES)</option>
             </select>
@@ -35,32 +35,32 @@
 
         <!-- Agente/Remetente (WhatsApp) -->
         <div class="event-form__group" v-if="form.channel==='whatsapp'">
-          <label class="event-form__label">Agente/Remetente (WhatsApp)</label>
-          <select class="event-form__input" v-model="form.agent">
+          <label class="event-form__label text-n-slate-11">Agente/Remetente (WhatsApp)</label>
+          <select class="event-form__input text-n-slate-12" v-model="form.agent">
             <option disabled value="">Selecionar...</option>
             <option v-for="a in agents" :key="a.id" :value="a.number">
               {{ a.label }}
             </option>
           </select>
-          <p class="hint">Mensagens serão enviadas a partir deste número.</p>
+          <p class="hint text-n-slate-10">Mensagens serão enviadas a partir deste número.</p>
         </div>
 
         <!-- Variáveis personalizadas -->
         <div class="event-form__group">
-          <label class="event-form__label">Variáveis personalizadas (placeholders)</label>
+          <label class="event-form__label text-n-slate-11">Variáveis personalizadas (placeholders)</label>
           <div class="dest-actions dest-actions--wrap">
             <input
-              class="event-form__input dest-actions__grow"
+              class="event-form__input dest-actions__grow text-n-slate-12"
               v-model="_newVar"
               placeholder="Ex.: var1, orderId"
               @keyup.enter.prevent="addVar"
             />
             <button type="button" class="btn btn--secondary" @click="addVar">Adicionar variável</button>
-            <span class="hint">
+            <span class="hint text-n-slate-10">
               Use-as nas mensagens como <code v-pre>{{var1}}</code>, <code v-pre>{{orderId}}</code>.
             </span>
           </div>
-          <div v-if="form.customFields?.length" class="hint hint--pills">
+          <div v-if="form.customFields?.length" class="hint hint--pills text-n-slate-10">
             <span>Atuais:</span>
             <code v-for="v in form.customFields" :key="v" class="pill">{{ v }}</code>
           </div>
@@ -69,7 +69,7 @@
         <!-- Destinatários -->
         <div class="event-form__group">
           <div class="dest-toolbar">
-            <label class="event-form__label">Destinatários</label>
+            <label class="event-form__label text-n-slate-11">Destinatários</label>
             <div class="dest-actions">
               <button type="button" class="btn btn--secondary" @click="addRecipient">Adicionar</button>
 
@@ -90,7 +90,7 @@
             </div>
           </div>
 
-          <p class="hint">
+          <p class="hint text-n-slate-10">
             CSV com cabeçalho:
             <template v-if="form.channel==='email'">
               <code>name</code>/<code>nome</code>, <code>email</code>/<code>e-mail</code>
@@ -102,24 +102,24 @@
           </p>
 
           <div class="recipients-grid">
-            <div v-for="(r, idx) in form.recipients" :key="idx" class="recipient-row card">
+            <div v-for="(r, idx) in form.recipients" :key="idx" class="recipient-row card bg-n-background border-n-container">
               <div class="recipient-col">
-                <label class="event-form__label">Nome</label>
-                <input class="event-form__input" v-model="r.name" placeholder="Ana" />
+                <label class="event-form__label text-n-slate-11">Nome</label>
+                <input class="event-form__input text-n-slate-12" v-model="r.name" placeholder="Ana" />
               </div>
               <div class="recipient-col" v-if="form.channel==='email'">
-                <label class="event-form__label">Email</label>
-                <input class="event-form__input" v-model="r.email" placeholder="ana@exemplo.com" />
+                <label class="event-form__label text-n-slate-11">Email</label>
+                <input class="event-form__input text-n-slate-12" v-model="r.email" placeholder="ana@exemplo.com" />
               </div>
               <div class="recipient-col" v-else>
-                <label class="event-form__label">Telefone (WhatsApp)</label>
-                <input class="event-form__input" v-model="r.phone" placeholder="+5532999999999" />
+                <label class="event-form__label text-n-slate-11">Telefone (WhatsApp)</label>
+                <input class="event-form__input text-n-slate-12" v-model="r.phone" placeholder="+5532999999999" />
               </div>
 
               <!-- Variáveis dinâmicas -->
               <div class="recipient-col" v-for="key in form.customFields" :key="key + '-' + idx">
-                <label class="event-form__label">{{ key }}</label>
-                <input class="event-form__input" v-model="r.vars[key]" :placeholder="key" />
+                <label class="event-form__label text-n-slate-11">{{ key }}</label>
+                <input class="event-form__input text-n-slate-12" v-model="r.vars[key]" :placeholder="key" />
               </div>
 
               <div class="recipient-actions">
@@ -140,15 +140,15 @@
         <!-- Payload (Email ou WhatsApp) -->
         <div class="grid two-cols" v-if="form.channel==='email'">
           <div class="event-form__group">
-            <label class="event-form__label">Assunto</label>
-            <input class="event-form__input" v-model="form.payload.subject" placeholder="Mensagem" />
+            <label class="event-form__label text-n-slate-11">Assunto</label>
+            <input class="event-form__input text-n-slate-12" v-model="form.payload.subject" placeholder="Mensagem" />
           </div>
           <div></div>
 
           <div class="event-form__group col-span-2">
-            <label class="event-form__label">Texto/Corpo</label>
+            <label class="event-form__label text-n-slate-11">Texto/Corpo</label>
             <textarea
-              class="event-form__textarea"
+              class="event-form__textarea text-n-slate-12"
               rows="5"
               v-model="form.payload.text"
               placeholder="Olá {{name}}!"
@@ -156,9 +156,9 @@
           </div>
 
           <div class="event-form__group col-span-2">
-            <label class="event-form__label">HTML (opcional)</label>
+            <label class="event-form__label text-n-slate-11">HTML (opcional)</label>
             <textarea
-              class="event-form__textarea"
+              class="event-form__textarea text-n-slate-12"
               rows="5"
               v-model="form.payload.html"
               placeholder="<p>Olá {{name}}!</p>"
@@ -167,62 +167,62 @@
         </div>
 
         <div v-else class="event-form__group">
-          <label class="event-form__label">Mensagem padrão (fallback)</label>
+          <label class="event-form__label text-n-slate-11">Mensagem padrão (fallback)</label>
           <textarea
-            class="event-form__textarea"
+            class="event-form__textarea text-n-slate-12"
             rows="4"
             v-model="form.payload.message"
             placeholder="Olá {{name}}!"
           ></textarea>
-          <p class="hint">Para recorrentes, você pode definir uma <b>mensagem por dia</b> abaixo.</p>
+          <p class="hint text-n-slate-10">Para recorrentes, você pode definir uma <b>mensagem por dia</b> abaixo.</p>
         </div>
 
         <!-- Tipo de agendamento -->
-        <div class="event-form__group box">
+        <div class="event-form__group box bg-n-background border-n-weak">
           <div class="row">
             <input type="checkbox" v-model="oneShot" id="oneshot" />
-            <label for="oneshot">Agendar uma única vez (runAt, UTC)</label>
+            <label for="oneshot" class="text-n-slate-12">Agendar uma única vez (runAt, UTC)</label>
           </div>
 
           <div v-if="oneShot" class="grid oneshot-grid">
             <div>
-              <label class="event-form__label">Executar em (ISO UTC, sufixo Z)</label>
-              <input class="event-form__input" v-model="form.runAt" placeholder="2025-09-05T15:00:00Z" />
+              <label class="event-form__label text-n-slate-11">Executar em (ISO UTC, sufixo Z)</label>
+              <input class="event-form__input text-n-slate-12" v-model="form.runAt" placeholder="2025-09-05T15:00:00Z" />
             </div>
             <div>
-              <label class="event-form__label">Timezone</label>
+              <label class="event-form__label text-n-slate-11">Timezone</label>
               <input class="event-form__input" value="— não aplicável —" disabled />
             </div>
           </div>
 
           <div v-else class="grid recurrent-grid">
             <div>
-              <label class="event-form__label">Dias da semana</label>
+              <label class="event-form__label text-n-slate-11">Dias da semana</label>
               <div class="dow">
-                <label v-for="d in DOW" :key="d.value" class="dow-item">
+                <label v-for="d in DOW" :key="d.value" class="dow-item text-n-slate-12">
                   <input type="checkbox" :value="d.value" v-model="form.daysOfWeek" />
                   <span>{{ d.label }}</span>
                 </label>
               </div>
             </div>
             <div>
-              <label class="event-form__label">Horário (HH:mm)</label>
-              <input class="event-form__input" v-model="form.time" placeholder="08:00" />
+              <label class="event-form__label text-n-slate-11">Horário (HH:mm)</label>
+              <input class="event-form__input text-n-slate-12" v-model="form.time" placeholder="08:00" />
             </div>
             <div>
-              <label class="event-form__label">Timezone</label>
-              <input class="event-form__input" v-model="form.timezone" placeholder="America/Sao_Paulo" />
+              <label class="event-form__label text-n-slate-11">Timezone</label>
+              <input class="event-form__input text-n-slate-12" v-model="form.timezone" placeholder="America/Sao_Paulo" />
             </div>
           </div>
 
           <!-- Mensagens por dia (WhatsApp + recorrente) -->
           <div v-if="!oneShot && form.channel==='whatsapp'" class="event-form__group">
-            <label class="event-form__label">Mensagens por dia selecionado</label>
+            <label class="event-form__label text-n-slate-11">Mensagens por dia selecionado</label>
             <div class="grid two-cols">
               <div v-for="d in form.daysOfWeek" :key="d" class="event-form__group">
-                <label class="event-form__label">{{ labelFor(d) }}</label>
+                <label class="event-form__label text-n-slate-11">{{ labelFor(d) }}</label>
                 <textarea
-                  class="event-form__textarea"
+                  class="event-form__textarea text-n-slate-12"
                   rows="4"
                   v-model="form.payload.messagesByDay[d]"
                   :placeholder="`Mensagem para ${labelFor(d)} (suporta {{name}} e variáveis personalizadas)`"
@@ -230,7 +230,7 @@
                 <p v-if="!dayHasMessage(d)" class="event-form__error">Obrigatório para {{ labelFor(d) }}</p>
               </div>
             </div>
-            <p class="hint">
+            <p class="hint text-n-slate-10">
               Se algum dia não tiver mensagem, o formulário não permitirá salvar.
               O campo "Mensagem padrão" acima será usado como <i>fallback</i> quando não houver mensagem por dia.
             </p>
@@ -238,25 +238,25 @@
 
           <!-- Vigência -->
           <div class="event-form__group">
-            <label class="event-form__label">Vigência (UTC)</label>
+            <label class="event-form__label text-n-slate-11">Vigência (UTC)</label>
             <div class="grid two-cols">
               <div>
-                <label class="event-form__label">Início (startAt, ISO)</label>
-                <input class="event-form__input" v-model="form.startAt" placeholder="2025-09-01T00:00:00Z" />
+                <label class="event-form__label text-n-slate-11">Início (startAt, ISO)</label>
+                <input class="event-form__input text-n-slate-12" v-model="form.startAt" placeholder="2025-09-01T00:00:00Z" />
               </div>
               <div>
-                <label class="event-form__label">Fim (endAt, ISO)</label>
-                <input class="event-form__input" v-model="form.endAt" placeholder="2025-12-31T23:59:59Z" />
+                <label class="event-form__label text-n-slate-11">Fim (endAt, ISO)</label>
+                <input class="event-form__input text-n-slate-12" v-model="form.endAt" placeholder="2025-12-31T23:59:59Z" />
               </div>
             </div>
             <p v-if="!validDateRange" class="event-form__error">A data de fim deve ser posterior à data de início.</p>
-            <p class="hint">O envio só ocorrerá se o horário atual estiver dentro dessa janela.</p>
+            <p class="hint text-n-slate-10">O envio só ocorrerá se o horário atual estiver dentro dessa janela.</p>
           </div>
 
           <div class="event-form__group" style="margin-top:12px">
             <label class="event-form__checkbox-container">
               <input type="checkbox" v-model="form.enabled" class="event-form__checkbox" />
-              <span class="event-form__checkbox-label">Agendamento habilitado</span>
+              <span class="event-form__checkbox-label text-n-slate-12">Agendamento habilitado</span>
             </label>
           </div>
         </div>
@@ -680,10 +680,10 @@ export default {
 </script>
 
 <style scoped>
-/* ----- Layout base ----- */
+/* ===== Layout base ===== */
 .event-registration {
   min-height: 100%;
-  color: #e5e5e5;
+  color: var(--n-slate-12);
   padding: 16px;
 }
 .event-registration__content {
@@ -691,29 +691,28 @@ export default {
   margin: 0 auto;
 }
 .event-registration__header { margin: 0 auto 24px; text-align: center; max-width: 960px; }
-.event-registration__title { font-size: 28px; font-weight: 800; margin-bottom: 8px; color: #fff; letter-spacing: .2px; }
-.event-registration__description { color: #a0a0a0; font-size: 16px; }
+.event-registration__title { font-size: 28px; font-weight: 800; margin-bottom: 8px; letter-spacing: .2px; }
+.event-registration__description { font-size: 16px; }
 
 /* ----- Form wrapper ----- */
 .event-form {
-  background: #1f1f1f;
   padding: 28px;
   border-radius: 16px;
-  border: 1px solid #323232;
+  border: 1px solid var(--n-container);
   margin-bottom: 24px;
   box-shadow: 0 6px 18px rgba(0,0,0,.25);
 }
 .event-form__group { margin-bottom: 18px; }
-.event-form__label { display: block; margin-bottom: 8px; font-weight: 600; color: #fff; font-size: 14px; }
+.event-form__label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
 
 /* ----- Inputs ----- */
 .event-form__input,
 .event-form__textarea {
-  background-color: #141414;
-  color: #e5e5e5;
+  background-color: var(--n-background);
+  color: var(--n-slate-12);
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #343434;
+  border: 1px solid var(--n-container);
   border-radius: 12px;
   font-size: 16px;
   line-height: 1.4;
@@ -728,20 +727,20 @@ export default {
 .event-form__input:focus,
 .event-form__textarea:focus {
   outline: none;
-  border-color: #4f9cf9;
-  box-shadow: 0 0 0 2px rgba(79,156,249,.25);
-  background-color: #121212;
+  border-color: var(--n-brand);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--n-brand) 25%, transparent);
+  background-color: #111317;
 }
 .event-form__input::placeholder,
-.event-form__textarea::placeholder { color: #8a8a8a; }
-.event-form__error { color: #ef4444; font-size: 14px; margin-top: 8px; }
+.event-form__textarea::placeholder { color: var(--n-slate-10); }
+.event-form__error { color: var(--n-ruby-9); font-size: 14px; margin-top: 8px; }
 
 /* select: evitar “corte” e dar mais área clicável */
 select.event-form__input {
   appearance: none;
   background-image:
-    linear-gradient(45deg, transparent 50%, #9aa0a6 50%),
-    linear-gradient(135deg, #9aa0a6 50%, transparent 50%);
+    linear-gradient(45deg, transparent 50%, var(--n-slate-10) 50%),
+    linear-gradient(135deg, var(--n-slate-10) 50%, transparent 50%);
   background-position:
     calc(100% - 18px) calc(1em + 2px),
     calc(100% - 14px) calc(1em + 2px);
@@ -782,22 +781,20 @@ select.event-form__input {
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
 
-.hint { color: #a0a0a0; font-size: 13px; margin-top: 6px; }
+.hint { font-size: 13px; margin-top: 6px; }
 .hint--pills { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
 .pill {
-  background: #262626;
-  border: 1px solid #343434;
+  background: var(--n-solid-1);
+  border: 1px solid var(--n-container);
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 12px;
-  color: #d6d6d6;
 }
 
 /* ---- Cards (linhas de destinatários) ---- */
 .recipients-grid { display: grid; gap: 12px; }
 .card {
-  background: #171717;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--n-container);
   border-radius: 14px;
   padding: 14px;
 }
@@ -812,15 +809,15 @@ select.event-form__input {
 
 /* CSV report */
 .csv-report { font-size: 13px; margin-top: 6px; }
-.csv-report.ok { color: #10b981; }
-.csv-report.err { color: #ef4444; }
+.csv-report.ok { color: var(--n-teal-11); }
+.csv-report.err { color: var(--n-ruby-11); }
 
 /* ----- Box de agendamento ----- */
 .box {
-  border: 1px solid #2d2d2d;
+  border: 1px solid var(--n-weak);
   border-radius: 14px;
   padding: 18px;
-  background: #151515;
+  background: var(--n-background);
 }
 .row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
 
@@ -836,9 +833,9 @@ select.event-form__input {
 }
 .dow { display: flex; gap: 8px; flex-wrap: wrap; }
 .dow-item { display: flex; align-items: center; gap: 6px; }
-.event-form__checkbox { width: 18px; height: 18px; accent-color: #4f9cf9; }
+.event-form__checkbox { width: 18px; height: 18px; accent-color: var(--n-brand); }
 .event-form__checkbox-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.event-form__checkbox-label { color: #e5e5e5; }
+.event-form__checkbox-label { }
 
 /* ----- Ações ----- */
 .event-form__actions {
@@ -865,17 +862,17 @@ select.event-form__input {
   transition: all .2s;
   font-size: 14px;
 }
-.btn--primary { background: #4f9cf9; color: #fff; box-shadow: 0 6px 14px rgba(79,156,249,.22); }
-.btn--primary:hover:not(:disabled) { background: #3b82f6; transform: translateY(-1px); }
-.btn--secondary { background: #2a2a2a; border: 1px solid #3a3a3a; color: #e5e5e5; }
-.btn--secondary:hover:not(:disabled) { background: #333; }
-.btn--ghost { background: transparent; border: 1px solid #3a3a3a; color: #e5e5e5; }
+.btn--primary { background: var(--n-brand); color: #fff; box-shadow: 0 6px 14px rgba(79,156,249,.22); }
+.btn--primary:hover:not(:disabled) { background: var(--n-brand-strong); transform: translateY(-1px); }
+.btn--secondary { background: var(--n-solid-1); border: 1px solid var(--n-container); color: var(--n-slate-12); }
+.btn--secondary:hover:not(:disabled) { background: #222831; }
+.btn--ghost { background: transparent; border: 1px solid var(--n-container); color: var(--n-slate-12); }
 .btn:disabled { opacity: .6; cursor: not-allowed; }
 
 /* ----- Alerts ----- */
-.alert { padding: 16px; border-radius: 12px; margin-bottom: 24px; }
-.alert--success { background: #064e3b; border: 1px solid #10b981; color: #10b981; }
-.alert--error { background: #7f1d1d; border: 1px solid #ef4444; color: #ef4444; }
+.alert { padding: 16px; border-radius: 12px; margin-bottom: 24px; border: 1px solid var(--n-container); }
+.alert--success { background: var(--n-teal-1); color: var(--n-teal-11); }
+.alert--error { background: var(--n-ruby-1); color: var(--n-ruby-11); }
 .alert__title { font-weight: 800; margin: 0 0 8px 0; }
 .alert__message { margin: 0; }
 
