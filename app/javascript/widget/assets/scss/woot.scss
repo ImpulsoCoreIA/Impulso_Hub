@@ -358,25 +358,26 @@ blockquote {
     --gray-11: 180 180 180;
     --gray-12: 238 238 238;
 
-    --background-color: 18 18 19;
-    --border-strong: 52 52 52;
-    --border-weak: 38 38 42;
-    --solid-1: 23 23 26;
-    --solid-2: 29 30 36;
-    --solid-3: 44 45 54;
-    --solid-active: 53 57 66;
+   // ImpulsoCore dark palette
+    --background-color: 11 16 32; // #0b1020
+    --border-strong: 35 44 66;
+    --border-weak: 28 34 54;
+    --solid-1: 15 22 46; // #0f162e
+    --solid-2: 17 24 39; // #111827
+    --solid-3: 32 41 72;
+    --solid-active: 35 47 86;
     --solid-amber: 42 37 30;
-    --solid-blue: 16 49 91;
+    --solid-blue: 21 99 155;
     --solid-iris: 38 42 101;
-    --text-blue: 126 182 255;
+    --text-blue: 165 243 252; // #a5f3fc
 
-    --alpha-1: 36, 36, 36, 0.8;
-    --alpha-2: 139, 147, 182, 0.15;
-    --alpha-3: 36, 38, 45, 0.9;
+    --alpha-1: 8, 10, 20, 0.8;
+    --alpha-2: 34, 211, 238, 0.15;
+    --alpha-3: 8, 10, 20, 0.9;
     --black-alpha-1: 0, 0, 0, 0.3;
     --black-alpha-2: 0, 0, 0, 0.2;
-    --border-blue: 39, 129, 246, 0.5;
+    --border-blue: 34, 211, 238, 0.45;
     --border-container: 236, 236, 236, 0;
-    --white-alpha: 255, 255, 255, 0.1;
+    --white-alpha: 255, 255, 255, 0.08;
   }
 }
