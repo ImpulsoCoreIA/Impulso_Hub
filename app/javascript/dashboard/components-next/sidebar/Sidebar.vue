@@ -514,7 +514,7 @@ const menuItems = computed(() => {
 const visibleMenuItems = computed(() => {
   if (FULL_ACCESS) return menuItems.value;
 
-  const hideSections = new Set(['Reports', 'Campaigns', 'Portals']);
+  const hideSections = new Set(['Campaigns', 'Portals']);
   const hideSettingsChildren = new Set([
     'Settings Custom Attributes',
     'Settings Automation',
