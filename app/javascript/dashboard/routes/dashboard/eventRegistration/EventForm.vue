@@ -36,7 +36,7 @@
         <!-- Agente/Remetente (WhatsApp) -->
         <div class="event-form__group" v-if="form.channel==='whatsapp'">
           <label class="event-form__label text-n-slate-11">Agente/Remetente (WhatsApp)</label>
-          <select class="event-form__input text-n-slate-12" v-model="form.agent">
+          <select class="event-form__input text-n-slate-12" v-model="form.agent" @change="onAgentChange">
             <option disabled value="">Selecionar...</option>
             <option v-for="a in agents" :key="a.id" :value="a.number">
               {{ a.label }}
@@ -168,13 +168,43 @@
 
         <div v-else class="event-form__group">
           <label class="event-form__label text-n-slate-11">Mensagem padrão (fallback)</label>
+
+          <!-- Toolbar de Templates (WhatsApp) -->
+          <div class="dest-actions dest-actions--wrap" v-if="form.channel==='whatsapp'">
+            <select class="event-form__input dest-actions__grow text-n-slate-12"
+                    v-model="selectedTemplateKey"
+                    :disabled="templatesLoading || !templates.length">
+              <option disabled value="">{{ templatesLoading ? 'Carregando templates...' : (templates.length ? 'Selecionar template...' : 'Nenhum template encontrado') }}</option>
+              <option v-for="t in templates" :key="t.key" :value="t.key">
+                {{ t.title }}
+              </option>
+            </select>
+            <button type="button" class="btn btn--secondary" :disabled="!selectedTemplate" @click="applySelectedTemplate">
+              Aplicar template
+            </button>
+            <button type="button" class="btn btn--ghost" :disabled="templatesLoading" @click="loadTemplates">
+              Recarregar
+            </button>
+            <button type="button" class="btn btn--ghost" :disabled="templatesLoading" @click="syncTemplates">
+              Sincronizar no Chatwoot
+            </button>
+          </div>
+          <p v-if="selectedTemplate && selectedTemplate.placeholders?.length" class="hint text-n-slate-10">
+            Placeholders do template: <code v-for="p in selectedTemplate.placeholders" :key="p" class="pill">{{ p }}</code>
+          </p>
+
           <textarea
             class="event-form__textarea text-n-slate-12"
             rows="4"
             v-model="form.payload.message"
             placeholder="Olá {{name}}!"
+            @input="recalcRequiredPlaceholders"
           ></textarea>
+
           <p class="hint text-n-slate-10">Para recorrentes, você pode definir uma <b>mensagem por dia</b> abaixo.</p>
+          <p v-if="placeholderGlobalError" class="event-form__error">
+            {{ placeholderGlobalError }}
+          </p>
         </div>
 
         <!-- Tipo de agendamento -->
@@ -226,6 +256,7 @@
                   rows="4"
                   v-model="form.payload.messagesByDay[d]"
                   :placeholder="`Mensagem para ${labelFor(d)} (suporta {{name}} e variáveis personalizadas)`"
+                  @input="recalcRequiredPlaceholders"
                 ></textarea>
                 <p v-if="!dayHasMessage(d)" class="event-form__error">Obrigatório para {{ labelFor(d) }}</p>
               </div>
@@ -234,6 +265,7 @@
               Se algum dia não tiver mensagem, o formulário não permitirá salvar.
               O campo "Mensagem padrão" acima será usado como <i>fallback</i> quando não houver mensagem por dia.
             </p>
+            <p v-if="placeholderDaysError" class="event-form__error">{{ placeholderDaysError }}</p>
           </div>
 
           <!-- Vigência -->
@@ -282,6 +314,7 @@ import axios from 'axios'
 
 const API_BASE = 'https://f4wzfjousg.execute-api.us-east-1.amazonaws.com/schedules'
 const AGENTS_API = 'https://f4wzfjousg.execute-api.us-east-1.amazonaws.com/get-agents-list'
+const TEMPLATES_API = 'https://f4wzfjousg.execute-api.us-east-1.amazonaws.com/get-whatsapp-templates'
 const DOW_LABEL = { SUN: 'Dom', MON: 'Seg', TUE: 'Ter', WED: 'Qua', THU: 'Qui', FRI: 'Sex', SAT: 'Sáb' }
 
 export default {
@@ -292,6 +325,12 @@ export default {
       api: axios.create({ baseURL: API_BASE, headers: { 'Content-Type': 'application/json' } }),
       agents: [],
       agentsLoading: false,
+
+      // templates (via Chatwoot -> Lambda)
+      templates: [],
+      templatesLoading: false,
+      selectedTemplateKey: '',
+
       DOW: [
         { value: 'MON', label: 'Seg' }, { value: 'TUE', label: 'Ter' }, { value: 'WED', label: 'Qua' },
         { value: 'THU', label: 'Qui' }, { value: 'FRI', label: 'Sex' }, { value: 'SAT', label: 'Sáb' }, { value: 'SUN', label: 'Dom' }
@@ -315,7 +354,12 @@ export default {
       submitting: false,
       status: { show: false, ok: true, msg: '' },
       csvReport: null,
-      _newVar: ''
+      _newVar: '',
+
+      // placeholders/validação
+      requiredPlaceholdersCache: new Set(), // calculado a partir dos textos
+      placeholderGlobalError: '',
+      placeholderDaysError: '',
     }
   },
   computed: {
@@ -326,6 +370,9 @@ export default {
       const sd = new Date(s), ed = new Date(e)
       if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return true
       return ed > sd
+    },
+    selectedTemplate() {
+      return this.templates.find(t => t.key === this.selectedTemplateKey)
     },
     isValid() {
       if (!this.form.name) return false
@@ -339,6 +386,9 @@ export default {
       }
 
       if (!this.validDateRange) return false
+
+      // validação de placeholders (front) — bloqueia se faltarem valores
+      if (!this.placeholdersSatisfied()) return false
 
       if (this.oneShot) {
         return !!this.form.runAt
@@ -394,6 +444,9 @@ export default {
           this.form.timezone = v.Timezone || 'America/Sao_Paulo'
           this.form.runAt = ''
         }
+
+        // recalcula required placeholders quando carregar edição
+        this.$nextTick(this.recalcRequiredPlaceholders)
       }
     },
     'form.channel'(ch) {
@@ -414,7 +467,9 @@ export default {
           message: this.form.payload.message || 'Olá {{name}}!',
           messagesByDay: this.form.payload.messagesByDay || {}
         }
+        this.loadTemplates() // quando trocar para WhatsApp, tenta carregar templates
       }
+      this.recalcRequiredPlaceholders()
     },
     'form.daysOfWeek': {
       deep: true,
@@ -427,6 +482,7 @@ export default {
         Object.keys(this.form.payload.messagesByDay).forEach(k => {
           if (!days.includes(k)) this.$delete(this.form.payload.messagesByDay, k)
         })
+        this.recalcRequiredPlaceholders()
       }
     },
     'form.customFields': {
@@ -439,6 +495,10 @@ export default {
           keys.forEach(k => { if (!(k in r.vars)) this.$set(r.vars, k, '') })
         }
       }
+    },
+    'form.agent'() {
+      // recarrega templates quando mudar agente (pois pode mudar o inbox do WhatsApp)
+      this.loadTemplates()
     }
   },
   methods: {
@@ -466,6 +526,62 @@ export default {
         console.error('Falha ao carregar agentes', e)
       } finally { this.agentsLoading = false }
     },
+    async loadTemplates() {
+      if (this.form.channel !== 'whatsapp') return
+      this.templatesLoading = true
+      this.templates = []
+      this.selectedTemplateKey = ''
+      try {
+        const params = new URLSearchParams()
+        if (this.form.agent) params.set('agent', this.form.agent)
+        const { data } = await axios.get(`${TEMPLATES_API}?${params.toString()}`)
+        const items = Array.isArray(data?.items) ? data.items : []
+        // normaliza para UI
+        this.templates = items.map((t, idx) => ({
+          key: `${t.name}::${t.language || t.locale || 'und'}::${idx}`,
+          name: t.name,
+          language: t.language || t.locale || '',
+          category: t.category || '',
+          status: t.status || '',
+          text: t.text || '',
+          placeholders: Array.isArray(t.placeholders) ? t.placeholders : [],
+          title: [t.name, t.language ? `(${t.language})` : ''].filter(Boolean).join(' ')
+        }))
+      } catch (e) {
+        console.error('Falha ao carregar templates', e)
+      } finally {
+        this.templatesLoading = false
+      }
+    },
+    async syncTemplates() {
+      if (this.form.channel !== 'whatsapp') return
+      try {
+        this.templatesLoading = true
+        const params = new URLSearchParams()
+        if (this.form.agent) params.set('agent', this.form.agent)
+        params.set('sync', '1')
+        await axios.get(`${TEMPLATES_API}?${params.toString()}`)
+        await this.loadTemplates()
+      } catch (e) {
+        console.error('Falha ao sincronizar templates', e)
+      } finally {
+        this.templatesLoading = false
+      }
+    },
+    applySelectedTemplate() {
+      if (!this.selectedTemplate) return
+      this.form.payload.message = this.selectedTemplate.text || ''
+      // adiciona variáveis detectadas do template à lista de customFields (sugestão de UX)
+      const vars = (this.selectedTemplate.placeholders || []).map(this.normalizeVarKey)
+      const merged = Array.from(new Set([...(this.form.customFields || []), ...vars].filter(Boolean)))
+      this.form.customFields = merged
+      this.recalcRequiredPlaceholders()
+    },
+    onAgentChange() {
+      // carregar templates p/ novo agente
+      this.loadTemplates()
+    },
+
     addVar() {
       const k = this.normalizeVarKey(this._newVar)
       if (!k) return
@@ -591,6 +707,7 @@ export default {
           this.form.recipients = [...this.form.recipients, ...newRecipients]
           this.csvReport = { ok: true, msg: `Importados ${imported}. Ignorados ${skipped}. Total agora: ${this.form.recipients.length}.` }
           e.target.value = ''
+          this.recalcRequiredPlaceholders()
         } catch (err) {
           console.error(err); this.csvReport = { ok: false, msg: 'Erro ao processar o CSV.' }
         }
@@ -613,6 +730,90 @@ export default {
     },
     isValidEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) },
     isLikelyPhone(phone) { const digits = phone.replace(/\D/g, ''); return digits.length >= 10 && digits.length <= 15 },
+
+    // ===== Placeholders =====
+    extractPlaceholders(text) {
+      const set = new Set()
+      if (!text) return set
+      const re = /\{\{\s*([a-zA-Z0-9_\.\-]+)\s*\}\}/g
+      let m
+      while ((m = re.exec(text))) {
+        set.add(this.normalizeVarKey(m[1]))
+      }
+      return set
+    },
+    recomputeRequiredFromTexts() {
+      const req = new Set()
+      if (this.form.channel === 'email') {
+        const p = this.form.payload || {}
+        ;[p.subject, p.text, p.html].forEach(t => this.extractPlaceholders(t).forEach(k => req.add(k)))
+        return req
+      }
+      // whatsapp
+      const base = this.form.payload?.message || ''
+      this.extractPlaceholders(base).forEach(k => req.add(k))
+      if (!this.oneShot) {
+        const byDay = this.form.payload?.messagesByDay || {}
+        for (const d of this.form.daysOfWeek) {
+          this.extractPlaceholders(byDay[d] || '').forEach(k => req.add(k))
+        }
+      }
+      return req
+    },
+    recalcRequiredPlaceholders() {
+      this.requiredPlaceholdersCache = this.recomputeRequiredFromTexts()
+      // recalcula mensagens de erro
+      this.placeholderGlobalError = ''
+      this.placeholderDaysError = ''
+      // valida agora pra mostrar feedback visual
+      this.placeholdersSatisfied()
+    },
+    recipientHasVar(r, key) {
+      const k = this.normalizeVarKey(key)
+      if (k === 'name' || k === 'nome') return !!(r.name || '').trim()
+      if (k === 'email') return !!(r.email || '').trim()
+      if (k === 'phone' || k === 'telefone' || k === 'celular' || k === 'whatsapp') return !!(r.phone || '').trim()
+      const v = (r.vars || {})[k]
+      return v !== undefined && String(v).trim() !== ''
+    },
+    placeholdersSatisfied() {
+      // monta lista de requeridos a partir dos textos atuais
+      const required = Array.from(this.requiredPlaceholdersCache || [])
+      if (!required.length) return true
+
+      // checa por destinatário
+      const missingCount = new Map() // key -> count de recipients faltantes
+      let anyMissing = false
+      for (const k of required) missingCount.set(k, 0)
+      for (const r of this.form.recipients) {
+        for (const k of required) {
+          if (!this.recipientHasVar(r, k)) {
+            anyMissing = true
+            missingCount.set(k, (missingCount.get(k) || 0) + 1)
+          }
+        }
+      }
+      if (!anyMissing) {
+        this.placeholderGlobalError = ''
+        this.placeholderDaysError = ''
+        return true
+      }
+      // formata mensagem de erro
+      const parts = Array.from(missingCount.entries())
+        .filter(([, c]) => c > 0)
+        .map(([k, c]) => `${k} (${c})`)
+      const msg = `Preencha as variáveis requeridas nos destinatários: ${parts.join(', ')}.`
+      if (this.form.channel === 'whatsapp') {
+        // se for recorrente, mostra também na seção por dia
+        if (!this.oneShot) this.placeholderDaysError = msg
+        else this.placeholderDaysError = ''
+        this.placeholderGlobalError = msg
+      } else {
+        this.placeholderGlobalError = msg
+      }
+      return false
+    },
+
     buildBackendBody() {
       const base = {
         name: this.form.name,
@@ -675,6 +876,8 @@ export default {
   },
   mounted() {
     this.loadAgents()
+    if (this.form.channel === 'whatsapp') this.loadTemplates()
+    this.recalcRequiredPlaceholders()
   }
 }
 </script>
