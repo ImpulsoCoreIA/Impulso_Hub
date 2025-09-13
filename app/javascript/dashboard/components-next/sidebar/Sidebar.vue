@@ -18,6 +18,15 @@ import SidebarAccountSwitcher from './SidebarAccountSwitcher.vue';
 import Logo from 'next/icon/Logo.vue';
 import ComposeConversation from 'dashboard/components-next/NewConversation/ComposeConversation.vue';
 
+const FULL_ACCESS =
+  String(
+    import.meta.env.VITE_IMPULSOCORE_FULL_ACESS ??
+      import.meta.env.VITE_IMPULSOCORE_FULL_ACCESS ??
+      ''
+  )
+    .trim()
+    .toLowerCase() === 'true';
+
 const props = defineProps({
   isMobileSidebarOpen: {
     type: Boolean,
@@ -47,9 +56,6 @@ const toggleShortcutModalFn = show => {
 
 useSidebarKeyboardShortcuts(toggleShortcutModalFn);
 
-// We're using localStorage to store the expanded item in the sidebar
-// This helps preserve context when navigating between portal and dashboard layouts
-// and also when the user refreshes the page
 const expandedItem = useStorage(
   'next-sidebar-expanded-item',
   null,
@@ -504,6 +510,30 @@ const menuItems = computed(() => {
     },
   ];
 });
+
+const visibleMenuItems = computed(() => {
+  if (FULL_ACCESS) return menuItems.value;
+
+  const hideSections = new Set(['Reports', 'Campaigns', 'Portals']);
+  const hideSettingsChildren = new Set([
+    'Settings Custom Attributes',
+    'Settings Automation',
+    'Settings Agent Bots',
+    'Settings Macros',
+    'Settings Canned Responses',
+    'Settings Integrations',
+  ]);
+
+  return menuItems.value
+    .filter(item => !hideSections.has(item.name))
+    .map(item => {
+      if (item.name !== 'Settings' || !item.children) return item;
+      return {
+        ...item,
+        children: item.children.filter(ch => !hideSettingsChildren.has(ch.name)),
+      };
+    });
+});
 </script>
 
 <template>
@@ -562,7 +592,7 @@ const menuItems = computed(() => {
     <nav class="grid flex-grow gap-2 px-2 pb-5 overflow-y-scroll no-scrollbar">
       <ul class="flex flex-col gap-1.5 m-0 list-none">
         <SidebarGroup
-          v-for="item in menuItems"
+          v-for="item in visibleMenuItems"
           :key="item.name"
           v-bind="item"
         />
