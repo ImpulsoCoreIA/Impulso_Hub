@@ -1,0 +1,310 @@
+<template>
+  <div class="event-registration text-n-slate-12">
+    <div class="event-registration__header">
+      <h1 class="event-registration__title text-n-slate-12">
+        {{ isEdit ? 'Editar Agendamento' : 'Novo Agendamento' }}
+      </h1>
+      <p class="event-registration__description text-n-slate-10">
+        Configure envio automático por WhatsApp ou Email (SES)
+      </p>
+    </div>
+
+    <div class="event-registration__content">
+      <form @submit.prevent="submit" class="event-form bg-n-solid-1 border-n-container">
+        <!-- bloco 1: nome/canal -->
+        <div class="grid two-cols">
+          <div class="event-form__group">
+            <label class="event-form__label text-n-slate-11">Nome (único)</label>
+            <input
+              class="event-form__input text-n-slate-12"
+              v-model.trim="form.name"
+              :disabled="isEdit"
+              placeholder="boas-vindas"
+              required
+            />
+          </div>
+
+          <div class="event-form__group">
+            <label class="event-form__label text-n-slate-11">Canal</label>
+            <select class="event-form__input text-n-slate-12" v-model="form.channel">
+              <option value="whatsapp">WhatsApp</option>
+              <option value="email">Email (SES)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Agente/Remetente (WhatsApp) -->
+        <div class="event-form__group" v-if="form.channel==='whatsapp'">
+          <label class="event-form__label text-n-slate-11">Agente/Remetente (WhatsApp)</label>
+          <select class="event-form__input text-n-slate-12" v-model="form.agent" @change="onAgentChange">
+            <option disabled value="">Selecionar...</option>
+            <option v-for="a in agents" :key="a.id" :value="a.number">
+              {{ a.label }}
+            </option>
+          </select>
+          <p class="hint text-n-slate-10">Mensagens serão enviadas a partir deste número.</p>
+        </div>
+
+        <!-- Variáveis personalizadas -->
+        <div class="event-form__group">
+          <label class="event-form__label text-n-slate-11">Variáveis personalizadas (placeholders)</label>
+          <div class="dest-actions dest-actions--wrap">
+            <input
+              class="event-form__input dest-actions__grow text-n-slate-12"
+              v-model="_newVar"
+              placeholder="Ex.: var1, orderId"
+              @keyup.enter.prevent="addVar"
+            />
+            <button type="button" class="btn btn--secondary" @click="addVar">Adicionar variável</button>
+            <span class="hint text-n-slate-10">
+              Use-as nas mensagens como <code v-pre>{{var1}}</code>, <code v-pre>{{orderId}}</code>.
+            </span>
+          </div>
+          <div v-if="form.customFields?.length" class="hint hint--pills text-n-slate-10">
+            <span>Atuais:</span>
+            <code v-for="v in form.customFields" :key="v" class="pill">{{ v }}</code>
+          </div>
+        </div>
+
+        <!-- Destinatários -->
+        <div class="event-form__group">
+          <div class="dest-toolbar">
+            <label class="event-form__label text-n-slate-11">Destinatários</label>
+            <div class="dest-actions">
+              <button type="button" class="btn btn--secondary" @click="addRecipient">Adicionar</button>
+
+              <!-- Importar CSV -->
+              <label class="btn btn--secondary" title="Importar CSV">
+                Importar CSV
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  class="visually-hidden"
+                  @change="handleCsvUpload"
+                />
+              </label>
+
+              <button type="button" class="btn btn--ghost" @click="downloadCsvTemplate">
+                Baixar modelo CSV
+              </button>
+            </div>
+          </div>
+
+          <p class="hint text-n-slate-10">
+            CSV com cabeçalho:
+            <template v-if="form.channel==='email'">
+              <code>name</code>/<code>nome</code>, <code>email</code>/<code>e-mail</code>
+            </template>
+            <template v-else>
+              <code>name</code>/<code>nome</code>, <code>phone</code>/<code>telefone</code>/<code>celular</code>/<code>whatsapp</code>
+            </template>
+            (delimitador vírgula <code>,</code> ou ponto e vírgula <code>;</code>). As colunas extras viram variáveis.
+          </p>
+
+          <div class="recipients-grid">
+            <div v-for="(r, idx) in form.recipients" :key="idx" class="recipient-row card bg-n-background border-n-container">
+              <div class="recipient-col">
+                <label class="event-form__label text-n-slate-11">Nome</label>
+                <input class="event-form__input text-n-slate-12" v-model="r.name" placeholder="Ana" />
+              </div>
+              <div class="recipient-col" v-if="form.channel==='email'">
+                <label class="event-form__label text-n-slate-11">Email</label>
+                <input class="event-form__input text-n-slate-12" v-model="r.email" placeholder="ana@exemplo.com" />
+              </div>
+              <div class="recipient-col" v-else>
+                <label class="event-form__label text-n-slate-11">Telefone (WhatsApp)</label>
+                <input class="event-form__input text-n-slate-12" v-model="r.phone" placeholder="+5532999999999" />
+              </div>
+
+              <!-- Variáveis dinâmicas -->
+              <div class="recipient-col" v-for="key in form.customFields" :key="key + '-' + idx">
+                <label class="event-form__label text-n-slate-11">{{ key }}</label>
+                <input class="event-form__input text-n-slate-12" v-model="r.vars[key]" :placeholder="key" />
+              </div>
+
+              <div class="recipient-actions">
+                <button type="button" class="btn btn--ghost" @click="removeRecipient(idx)">Remover</button>
+              </div>
+            </div>
+
+            <p v-if="!form.recipients.length" class="event-form__error">
+              Adicione manualmente ou importe via CSV.
+            </p>
+
+            <p v-if="csvReport" class="csv-report" :class="csvReport.ok ? 'ok' : 'err'">
+              {{ csvReport.msg }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Payload (Email ou WhatsApp) -->
+        <div class="grid two-cols" v-if="form.channel==='email'">
+          <div class="event-form__group">
+            <label class="event-form__label text-n-slate-11">Assunto</label>
+            <input class="event-form__input text-n-slate-12" v-model="form.payload.subject" placeholder="Mensagem" />
+          </div>
+          <div></div>
+
+          <div class="event-form__group col-span-2">
+            <label class="event-form__label text-n-slate-11">Texto/Corpo</label>
+            <textarea
+              class="event-form__textarea text-n-slate-12"
+              rows="5"
+              v-model="form.payload.text"
+              placeholder="Olá {{name}}!"
+            ></textarea>
+          </div>
+
+          <div class="event-form__group col-span-2">
+            <label class="event-form__label text-n-slate-11">HTML (opcional)</label>
+            <textarea
+              class="event-form__textarea text-n-slate-12"
+              rows="5"
+              v-model="form.payload.html"
+              placeholder="<p>Olá {{name}}!</p>"
+            ></textarea>
+          </div>
+        </div>
+
+        <div v-else class="event-form__group">
+          <label class="event-form__label text-n-slate-11">Mensagem padrão (fallback)</label>
+
+          <!-- Toolbar de Templates (WhatsApp) -->
+          <div class="dest-actions dest-actions--wrap" v-if="form.channel==='whatsapp'">
+            <select class="event-form__input dest-actions__grow text-n-slate-12"
+                    v-model="selectedTemplateKey"
+                    :disabled="templatesLoading || !templates.length">
+              <option disabled value="">{{ templatesLoading ? 'Carregando templates...' : (templates.length ? 'Selecionar template...' : 'Nenhum template encontrado') }}</option>
+              <option v-for="t in templates" :key="t.key" :value="t.key">
+                {{ t.title }}
+              </option>
+            </select>
+            <button type="button" class="btn btn--secondary" :disabled="!selectedTemplate" @click="applySelectedTemplate">
+              Aplicar template
+            </button>
+            <button type="button" class="btn btn--ghost" :disabled="templatesLoading" @click="loadTemplates">
+              Recarregar
+            </button>
+            <button type="button" class="btn btn--ghost" :disabled="templatesLoading" @click="syncTemplates">
+              Sincronizar no Chatwoot
+            </button>
+          </div>
+          <p v-if="selectedTemplate && selectedTemplate.placeholders?.length" class="hint text-n-slate-10">
+            Placeholders do template: <code v-for="p in selectedTemplate.placeholders" :key="p" class="pill">{{ p }}</code>
+          </p>
+
+          <textarea
+            class="event-form__textarea text-n-slate-12"
+            rows="4"
+            v-model="form.payload.message"
+            placeholder="Olá {{name}}!"
+            @input="recalcRequiredPlaceholders"
+          ></textarea>
+
+          <p class="hint text-n-slate-10">Para recorrentes, você pode definir uma <b>mensagem por dia</b> abaixo.</p>
+          <p v-if="placeholderGlobalError" class="event-form__error">
+            {{ placeholderGlobalError }}
+          </p>
+        </div>
+
+        <!-- Tipo de agendamento -->
+        <div class="event-form__group box bg-n-background border-n-weak">
+          <div class="row">
+            <input type="checkbox" v-model="oneShot" id="oneshot" />
+            <label for="oneshot" class="text-n-slate-12">Agendar uma única vez (runAt, UTC)</label>
+          </div>
+
+          <div v-if="oneShot" class="grid oneshot-grid">
+            <div>
+              <label class="event-form__label text-n-slate-11">Executar em (ISO UTC, sufixo Z)</label>
+              <input class="event-form__input text-n-slate-12" v-model="form.runAt" placeholder="2025-09-05T15:00:00Z" />
+            </div>
+            <div>
+              <label class="event-form__label text-n-slate-11">Timezone</label>
+              <input class="event-form__input" value="— não aplicável —" disabled />
+            </div>
+          </div>
+
+          <div v-else class="grid recurrent-grid">
+            <div>
+              <label class="event-form__label text-n-slate-11">Dias da semana</label>
+              <div class="dow">
+                <label v-for="d in DOW" :key="d.value" class="dow-item text-n-slate-12">
+                  <input type="checkbox" :value="d.value" v-model="form.daysOfWeek" />
+                  <span>{{ d.label }}</span>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="event-form__label text-n-slate-11">Horário (HH:mm)</label>
+              <input class="event-form__input text-n-slate-12" v-model="form.time" placeholder="08:00" />
+            </div>
+            <div>
+              <label class="event-form__label text-n-slate-11">Timezone</label>
+              <input class="event-form__input text-n-slate-12" v-model="form.timezone" placeholder="America/Sao_Paulo" />
+            </div>
+          </div>
+
+          <!-- Mensagens por dia (WhatsApp + recorrente) -->
+          <div v-if="!oneShot && form.channel==='whatsapp'" class="event-form__group">
+            <label class="event-form__label text-n-slate-11">Mensagens por dia selecionado</label>
+            <div class="grid two-cols">
+              <div v-for="d in form.daysOfWeek" :key="d" class="event-form__group">
+                <label class="event-form__label text-n-slate-11">{{ labelFor(d) }}</label>
+                <textarea
+                  class="event-form__textarea text-n-slate-12"
+                  rows="4"
+                  v-model="form.payload.messagesByDay[d]"
+                  :placeholder="`Mensagem para ${labelFor(d)} (suporta {{name}} e variáveis personalizadas)`"
+                  @input="recalcRequiredPlaceholders"
+                ></textarea>
+                <p v-if="!dayHasMessage(d)" class="event-form__error">Obrigatório para {{ labelFor(d) }}</p>
+              </div>
+            </div>
+            <p class="hint text-n-slate-10">
+              Se algum dia não tiver mensagem, o formulário não permitirá salvar.
+              O campo "Mensagem padrão" acima será usado como <i>fallback</i> quando não houver mensagem por dia.
+            </p>
+            <p v-if="placeholderDaysError" class="event-form__error">{{ placeholderDaysError }}</p>
+          </div>
+
+          <!-- Vigência -->
+          <div class="event-form__group">
+            <label class="event-form__label text-n-slate-11">Vigência (UTC)</label>
+            <div class="grid two-cols">
+              <div>
+                <label class="event-form__label text-n-slate-11">Início (startAt, ISO)</label>
+                <input class="event-form__input text-n-slate-12" v-model="form.startAt" placeholder="2025-09-01T00:00:00Z" />
+              </div>
+              <div>
+                <label class="event-form__label text-n-slate-11">Fim (endAt, ISO)</label>
+                <input class="event-form__input text-n-slate-12" v-model="form.endAt" placeholder="2025-12-31T23:59:59Z" />
+              </div>
+            </div>
+            <p v-if="!validDateRange" class="event-form__error">A data de fim deve ser posterior à data de início.</p>
+            <p class="hint text-n-slate-10">O envio só ocorrerá se o horário atual estiver dentro dessa janela.</p>
+          </div>
+
+          <div class="event-form__group" style="margin-top:12px">
+            <label class="event-form__checkbox-container">
+              <input type="checkbox" v-model="form.enabled" class="event-form__checkbox" />
+              <span class="event-form__checkbox-label text-n-slate-12">Agendamento habilitado</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Ações fixas -->
+        <div class="event-form__actions actions--sticky">
+          <button type="submit" class="btn btn--primary" :disabled="submitting || !isValid">
+            {{ submitting ? 'Salvando...' : (isEdit ? 'Salvar alterações' : 'Criar agendamento') }}
+          </button>
+        </div>
+      </form>
+
+      <div v-if="status.show" class="alert" :class="status.ok ? 'alert--success' : 'alert--error'">
+        <h3 class="alert__title">{{ status.ok ? '✓ Sucesso' : '✗ Erro' }}</h3>
+        <p class="alert__message">{{ status.msg }}</p>
+      </div>
+    </div>
+  </div>
+</template>
