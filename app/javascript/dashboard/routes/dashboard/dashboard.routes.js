@@ -29,11 +29,11 @@ export default {
         {
           path: 'event-registration',
           name: 'event_registration',
-          component: () => import('./eventRegistration/Index.vue'),
+          component: () => import('./eventRegistration/pages/Index.vue'),
           meta: {
-            permissions: ['administrator', 'agent']
-          }
-        }
+            permissions: ['administrator', 'agent'],
+          },
+        },
       ],
     },
     {
