@@ -1405,37 +1405,17 @@ onMounted(() => {
           <p v-if="!variableEntries.length" class="text-xs text-n-slate-10">
             {{ text.customField.empty }}
           </p>
-          <div v-else class="space-y-4">
-            <div
+          <div v-else class="flex flex-wrap gap-2">
+            <span
               v-for="variable in variableEntries"
               :key="variable.key"
-              class="rounded-2xl border border-n-weak bg-n-solid-2 p-3"
+              class="inline-flex items-center gap-2 rounded-full border border-n-weak bg-n-solid-2 px-3 py-1 text-xs uppercase tracking-wide text-n-slate-9"
             >
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-sm font-semibold text-n-slate-12">
-                  {{ variable.label }}
-                </span>
-                <span class="text-xs uppercase tracking-wide text-n-slate-9">
-                  {{ variable.key }}
-                </span>
-              </div>
-              <div class="mt-3 space-y-2">
-                <div
-                  v-for="(recipient, recipientIndex) in form.recipients"
-                  :key="`${variable.key}-${recipientIndex}`"
-                  class="flex flex-col gap-1 rounded-xl bg-n-solid-1 px-3 py-2 sm:flex-row sm:items-center sm:gap-3"
-                >
-                  <span class="text-xs font-medium uppercase tracking-wide text-n-slate-9 sm:w-40">
-                    {{ recipient.name || text.recipients.noName }}
-                  </span>
-                  <input
-                    v-model="recipient.vars[variable.key]"
-                    class="w-full rounded-xl border border-n-weak bg-n-background px-3 py-2 text-sm text-n-slate-12 focus:border-n-brand focus:outline-none"
-                    :placeholder="text.customField.valuePlaceholder"
-                  />
-                </div>
-              </div>
-            </div>
+              <span class="font-semibold text-n-slate-12 normal-case">
+                {{ variable.label }}
+              </span>
+              <span class="text-[11px] text-n-slate-9">{{ variable.key }}</span>
+            </span>
           </div>
         </div>
       </header>
@@ -1483,6 +1463,31 @@ onMounted(() => {
                   class="rounded-xl border border-n-weak bg-transparent px-4 py-2 text-sm focus:border-n-brand focus:outline-none"
                   :placeholder="text.recipients.phonePlaceholder"
                 />
+              </div>
+            </div>
+
+            <div
+              v-if="variableEntries.length"
+              class="space-y-2 rounded-2xl border border-n-weak bg-n-solid-2 p-3"
+            >
+              <h4 class="text-xs font-semibold uppercase tracking-wide text-n-slate-9">
+                {{ text.customField.title }}
+              </h4>
+              <div class="grid gap-3 md:grid-cols-2">
+                <div
+                  v-for="variable in variableEntries"
+                  :key="`${variable.key}-${index}`"
+                  class="flex flex-col gap-1"
+                >
+                  <label class="text-xs font-medium text-n-slate-10">
+                    {{ variable.label }}
+                  </label>
+                  <input
+                    v-model="recipient.vars[variable.key]"
+                    class="rounded-xl border border-n-weak bg-n-background px-3 py-2 text-sm text-n-slate-12 focus:border-n-brand focus:outline-none"
+                    :placeholder="text.customField.valuePlaceholder"
+                  />
+                </div>
               </div>
             </div>
 
