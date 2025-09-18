@@ -619,15 +619,14 @@ onBeforeUnmount(() => {
         <div
           class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
         >
-          <div class="flex w-full items-center gap-3 rounded-full border border-transparent bg-n-solid-2 px-4 py-1.5 lg:max-w-md">
-            <i class="i-lucide-search text-sm text-n-slate-10 flex-shrink-0" />
             <input
               v-model="filters.search"
               type="search"
               class="w-full bg-transparent text-xs font-medium text-n-slate-12 placeholder:text-n-slate-10 focus:outline-none"
               :placeholder="text.filters.searchPlaceholder"
             />
-          </div>
+            <i class="i-lucide-search text-sm text-n-slate-10 flex-shrink-0 -mt-[15px]" />
+
 
           <div class="flex w-full flex-wrap items-center gap-3 lg:justify-end">
             <div
