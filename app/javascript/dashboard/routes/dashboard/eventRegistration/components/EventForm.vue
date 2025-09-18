@@ -52,8 +52,9 @@ const text = Object.freeze({
   },
   customField: {
     title: 'Variáveis',
-    placeholder: 'nova_variavel',
-    add: 'Adicionar variável',
+    empty:
+      'Nenhuma variável detectada ainda. Utilize placeholders como {{nome}} na mensagem para adicioná-las automaticamente.',
+    valuePlaceholder: 'Preencha o valor para este destinatário',
   },
   recipients: {
     title: 'Destinatários',
@@ -216,6 +217,22 @@ const selectedTemplate = computed(
 const showFirstContactTemplate = computed(() =>
   form.recipients.some(recipient => Boolean(recipient.primeiroContato))
 );
+
+const variableEntries = computed(() => {
+  const entries = [];
+  knownVariables.value.forEach((info, key) => {
+    entries.push({ key, label: info.raw || key });
+  });
+  return entries;
+});
+
+const variableLabelMap = computed(() => {
+  const map = {};
+  knownVariables.value.forEach((info, key) => {
+    map[key] = info.raw || key;
+  });
+  return map;
+});
 
 const TEMPLATE_PLACEHOLDER_REGEX = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
 
@@ -401,8 +418,12 @@ function placeholdersSatisfied() {
     return true;
   }
 
+  const varsMap = knownVariables.value;
   const message = `Preencha as variáveis requeridas nos destinatários: ${missingList
-    .map(([key, count]) => `${key} (${count})`)
+    .map(([key, count]) => {
+      const label = varsMap.get(key)?.raw || key;
+      return `${label} (${count})`;
+    })
     .join(', ')}.`;
 
   placeholderGlobalError.value = text.placeholders.global(message);
@@ -455,42 +476,97 @@ const isValid = computed(() => {
 });
 
 function recomputeRequiredPlaceholders() {
-  if (!showFirstContactTemplate.value) {
-    requiredPlaceholders.value = new Set();
-    placeholderGlobalError.value = '';
-    placeholderDaysError.value = '';
-    return;
-  }
-  const bucket = new Set();
+  const details = new Map();
+
+  const addPlaceholder = (normalized, raw) => {
+    if (!normalized) return;
+    const existing = details.get(normalized) || { raw: raw || normalized };
+    if (!existing.raw && raw) {
+      existing.raw = raw;
+    }
+    details.set(normalized, existing);
+  };
+
   if (form.channel === 'email') {
     ['subject', 'text', 'html'].forEach(key => {
-      extractPlaceholders(form.payload?.[key]).forEach(value =>
-        bucket.add(value)
-      );
+      const placeholders = extractPlaceholders(form.payload?.[key]);
+      placeholders.forEach((raw, normalized) => addPlaceholder(normalized, raw));
     });
   } else {
-    extractPlaceholders(form.payload?.message).forEach(value =>
-      bucket.add(value)
+    const messagePlaceholders = extractPlaceholders(form.payload?.message);
+    messagePlaceholders.forEach((raw, normalized) =>
+      addPlaceholder(normalized, raw)
     );
     if (!oneShot.value) {
       const byDay = form.payload?.messagesByDay || {};
       form.daysOfWeek.forEach(day => {
-        extractPlaceholders(byDay[day]).forEach(value => bucket.add(value));
+        const placeholders = extractPlaceholders(byDay[day]);
+        placeholders.forEach((raw, normalized) =>
+          addPlaceholder(normalized, raw)
+        );
       });
     }
   }
-  requiredPlaceholders.value = bucket;
+
+  if (showFirstContactTemplate.value) {
+    const entriesByComponent = selectedTemplate.value?.placeholderEntries || {};
+    Object.values(entriesByComponent).forEach(entries => {
+      entries.forEach(({ raw, normalized }) => addPlaceholder(normalized, raw));
+    });
+
+    if (!selectedTemplate.value && templateFallback.value?.params) {
+      Object.values(templateFallback.value.params).forEach(mapping => {
+        Object.keys(mapping || {}).forEach(key => {
+          addPlaceholder(normalizeVarKey(key), key);
+        });
+      });
+    }
+  }
+
+  requiredPlaceholders.value = new Set(details.keys());
+  updateVariableRegistry(details);
   placeholderGlobalError.value = '';
   placeholderDaysError.value = '';
   placeholdersSatisfied();
 }
 
+function updateVariableRegistry(details) {
+  const orderedKeys = Array.from(details.keys()).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true })
+  );
+
+  const nextMap = new Map();
+  orderedKeys.forEach(key => {
+    const info = details.get(key) || {};
+    nextMap.set(key, {
+      key,
+      raw: info.raw || key,
+    });
+  });
+
+  knownVariables.value = nextMap;
+  form.customFields = orderedKeys;
+
+  form.recipients = form.recipients.map(recipient => {
+    const vars = { ...(recipient.vars || {}) };
+    orderedKeys.forEach(key => {
+      if (!Object.prototype.hasOwnProperty.call(vars, key)) {
+        vars[key] = '';
+      }
+    });
+    Object.keys(vars).forEach(existingKey => {
+      if (!details.has(existingKey)) {
+        delete vars[existingKey];
+      }
+    });
+    return { ...recipient, vars };
+  });
+}
+
 watch(showFirstContactTemplate, value => {
   if (!value) {
-    requiredPlaceholders.value = new Set();
-    placeholderGlobalError.value = '';
-    placeholderDaysError.value = '';
     templateFallback.value = null;
+    recomputeRequiredPlaceholders();
   } else {
     if (selectedTemplate.value && !templateFallback.value) {
       templateFallback.value = buildTemplateFallbackObject(selectedTemplate.value);
@@ -523,6 +599,7 @@ function resetForm() {
   placeholderGlobalError.value = '';
   placeholderDaysError.value = '';
   templateFallback.value = null;
+  knownVariables.value = new Map();
 }
 
 function hydrateFromValue(value) {
@@ -709,6 +786,7 @@ async function loadTemplates() {
     } else {
       selectedTemplateKey.value = '';
     }
+    nextTick(recomputeRequiredPlaceholders);
   } catch (error) {
     useAlert(text.alerts.templates);
   } finally {
@@ -736,21 +814,13 @@ async function syncTemplates() {
 function applyTemplate() {
   if (!selectedTemplate.value) return;
   form.payload.message = selectedTemplate.value.text || '';
-  const merged = new Set(
-    [
-      ...form.customFields.map(normalizeVarKey),
-      ...selectedTemplate.value.placeholders,
-    ].filter(Boolean)
-  );
-  form.customFields = Array.from(merged);
   templateFallback.value = buildTemplateFallbackObject(selectedTemplate.value);
   nextTick(recomputeRequiredPlaceholders);
 }
 
 function addRecipient() {
-  const vars = Object.fromEntries(
-    form.customFields.map(field => [normalizeVarKey(field), ''])
-  );
+  const variableKeys = Array.from(knownVariables.value.keys());
+  const vars = Object.fromEntries(variableKeys.map(key => [key, '']));
   form.recipients = [
     ...form.recipients,
     {
@@ -854,14 +924,6 @@ function handleCsvUpload(event) {
       const variableColumns = headers
         .map((header, index) => ({ header, index }))
         .filter(({ header }) => header && !knownHeaders.has(header));
-
-      const newFieldNames = variableColumns.map(({ index, header }) =>
-        normalizeVarKey(originalHeaders[index] || header)
-      );
-      const mergedFields = Array.from(
-        new Set([...form.customFields.map(normalizeVarKey), ...newFieldNames])
-      );
-      form.customFields = mergedFields;
 
       const existingKeys = new Set(
         form.recipients
@@ -1162,27 +1224,6 @@ watch(
 );
 
 watch(
-  () => form.customFields.map(normalizeVarKey),
-  keys => {
-    const normalizedKeys = keys.filter(Boolean);
-    form.recipients = form.recipients.map(recipient => {
-      const nextVars = { ...(recipient.vars || {}) };
-      Object.keys(nextVars).forEach(key => {
-        if (!normalizedKeys.includes(normalizeVarKey(key))) {
-          delete nextVars[key];
-        }
-      });
-      normalizedKeys.forEach(key => {
-        if (!Object.prototype.hasOwnProperty.call(nextVars, key)) {
-          nextVars[key] = '';
-        }
-      });
-      return { ...recipient, vars: nextVars };
-    });
-  }
-);
-
-watch(
   () => form.agent,
   value => {
     if (form.channel !== 'whatsapp') return;
@@ -1192,6 +1233,21 @@ watch(
       templates.value = [];
       selectedTemplateKey.value = '';
       templateFallback.value = null;
+      recomputeRequiredPlaceholders();
+    }
+  }
+);
+
+watch(
+  () => selectedTemplate.value,
+  template => {
+    if (template) {
+      templateFallback.value = buildTemplateFallbackObject(template);
+    } else if (templates.value.length && !selectedTemplateKey.value) {
+      templateFallback.value = null;
+    }
+    if (showFirstContactTemplate.value) {
+      nextTick(recomputeRequiredPlaceholders);
     }
   }
 );
@@ -1340,29 +1396,46 @@ onMounted(() => {
             />
           </div>
         </div>
-        <div class="flex w-full flex-col gap-2">
+        <div class="flex w-full flex-col gap-3">
           <label
             class="text-xs font-semibold uppercase tracking-wide text-n-slate-9"
           >
             {{ text.customField.title }}
           </label>
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <input
-              v-model="newVariable"
-              class="w-full rounded-xl border border-n-weak bg-n-background px-4 py-3 text-sm text-n-slate-12 focus:border-n-brand focus:outline-none"
-              :placeholder="text.customField.placeholder"
-              @keyup.enter.prevent="addCustomField"
-            />
-            <Button
-              variant="ghost"
-              color="slate"
-              size="sm"
-              icon="i-lucide-list-plus"
-              :label="text.customField.add"
-              type="button"
-              class="sm:w-auto"
-              @click="addCustomField"
-            />
+          <p v-if="!variableEntries.length" class="text-xs text-n-slate-10">
+            {{ text.customField.empty }}
+          </p>
+          <div v-else class="space-y-4">
+            <div
+              v-for="variable in variableEntries"
+              :key="variable.key"
+              class="rounded-2xl border border-n-weak bg-n-solid-2 p-3"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm font-semibold text-n-slate-12">
+                  {{ variable.label }}
+                </span>
+                <span class="text-xs uppercase tracking-wide text-n-slate-9">
+                  {{ variable.key }}
+                </span>
+              </div>
+              <div class="mt-3 space-y-2">
+                <div
+                  v-for="(recipient, recipientIndex) in form.recipients"
+                  :key="`${variable.key}-${recipientIndex}`"
+                  class="flex flex-col gap-1 rounded-xl bg-n-solid-1 px-3 py-2 sm:flex-row sm:items-center sm:gap-3"
+                >
+                  <span class="text-xs font-medium uppercase tracking-wide text-n-slate-9 sm:w-40">
+                    {{ recipient.name || text.recipients.noName }}
+                  </span>
+                  <input
+                    v-model="recipient.vars[variable.key]"
+                    class="w-full rounded-xl border border-n-weak bg-n-background px-3 py-2 text-sm text-n-slate-12 focus:border-n-brand focus:outline-none"
+                    :placeholder="text.customField.valuePlaceholder"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -1409,28 +1482,6 @@ onMounted(() => {
                   v-model="recipient.phone"
                   class="rounded-xl border border-n-weak bg-transparent px-4 py-2 text-sm focus:border-n-brand focus:outline-none"
                   :placeholder="text.recipients.phonePlaceholder"
-                />
-              </div>
-            </div>
-
-            <div
-              v-if="form.customFields.length"
-              class="grid gap-3 md:grid-cols-2"
-            >
-              <div
-                v-for="field in form.customFields"
-                :key="`${field}-${index}`"
-                class="flex flex-col gap-2"
-              >
-                <label
-                  class="text-xs font-semibold uppercase tracking-wide text-n-slate-9"
-                >
-                  {{ field }}
-                </label>
-                <input
-                  v-model="recipient.vars[field]"
-                  class="rounded-xl border border-n-weak bg-transparent px-4 py-2 text-sm focus:border-n-brand focus:outline-none"
-                  :placeholder="field"
                 />
               </div>
             </div>
