@@ -16,7 +16,7 @@ const API_BASE =
 const AGENTS_API =
   'https://f4wzfjousg.execute-api.us-east-1.amazonaws.com/get-agents-list';
 const TEMPLATES_API =
-  'https://f4wzfjousg.execute-api.us-east-1.amazonaws.com/get-whatsapp-templates';
+  'https://f4wzfjousg.execute-api.us-east-1.amazonaws.com/get-whatsapp-templates-list';
 
 const DAYS_OF_WEEK = [
   { value: 'MON', label: 'Segunda' },
@@ -35,10 +35,15 @@ const text = Object.freeze({
   },
   channel: {
     label: 'Canal',
+    placeholder: 'Selecionar canal',
     options: {
       whatsapp: 'WhatsApp',
       email: 'Email (SES)',
     },
+  },
+  tooltips: {
+    channel: 'Informe um nome para o agendamento antes de escolher o canal.',
+    agent: 'Selecione o canal para habilitar os agentes disponíveis.',
   },
   agent: {
     label: 'Agente / remetente',
@@ -159,7 +164,7 @@ const selectedTemplateKey = ref('');
 
 const form = reactive({
   name: '',
-  channel: 'whatsapp',
+  channel: '',
   agent: '',
   recipients: [],
   payload: { message: 'Olá {{name}}!', messagesByDay: {} },
@@ -183,6 +188,9 @@ const placeholderGlobalError = ref('');
 const placeholderDaysError = ref('');
 
 const isEdit = computed(() => Boolean(props.value?.Name));
+const isNameFilled = computed(() => !!form.name.trim());
+const canSelectChannel = computed(() => isNameFilled.value);
+const canSelectAgent = computed(() => canSelectChannel.value && !!form.channel);
 
 const validDateRange = computed(() => {
   const start = form.startAt?.trim();
@@ -296,7 +304,8 @@ function placeholdersSatisfied() {
 }
 
 const isValid = computed(() => {
-  if (!form.name) return false;
+  if (!form.name || !form.name.trim()) return false;
+  if (!form.channel) return false;
   if (!form.recipients.length) return false;
 
   if (form.channel === 'email') {
@@ -361,7 +370,7 @@ function recomputeRequiredPlaceholders() {
 
 function resetForm() {
   form.name = '';
-  form.channel = 'whatsapp';
+  form.channel = '';
   form.agent = '';
   form.recipients = [];
   form.payload = { message: 'Olá {{name}}!', messagesByDay: {} };
@@ -389,11 +398,17 @@ function hydrateFromValue(value) {
   if (!value) {
     resetForm();
     recomputeRequiredPlaceholders();
+    if (form.channel === 'whatsapp' && form.agent) {
+      loadTemplates();
+    } else {
+      templates.value = [];
+      selectedTemplateKey.value = '';
+    }
     return;
   }
 
   form.name = value.Name || '';
-  form.channel = value.Channel || 'whatsapp';
+  form.channel = value.Channel || '';
   form.agent = value.Agent || '';
   form.recipients = Array.isArray(value.Recipients)
     ? JSON.parse(JSON.stringify(value.Recipients))
@@ -443,7 +458,15 @@ function hydrateFromValue(value) {
   status.msg = '';
   status.ok = true;
 
-  nextTick(recomputeRequiredPlaceholders);
+  nextTick(() => {
+    recomputeRequiredPlaceholders();
+    if (form.channel === 'whatsapp' && form.agent) {
+      loadTemplates();
+    } else {
+      templates.value = [];
+      selectedTemplateKey.value = '';
+    }
+  });
 }
 
 async function loadAgents() {
@@ -457,9 +480,6 @@ async function loadAgents() {
           number: item.number,
         }))
       : [];
-    if (!form.agent && agents.value.length) {
-      form.agent = agents.value[0].number;
-    }
   } catch (error) {
     useAlert(text.alerts.agents);
   } finally {
@@ -468,13 +488,17 @@ async function loadAgents() {
 }
 
 async function loadTemplates() {
-  if (form.channel !== 'whatsapp') return;
+  if (form.channel !== 'whatsapp' || !form.agent) {
+    templates.value = [];
+    selectedTemplateKey.value = '';
+    return;
+  }
   templatesLoading.value = true;
   templates.value = [];
   selectedTemplateKey.value = '';
   try {
     const params = new URLSearchParams();
-    if (form.agent) params.set('agent', form.agent);
+    params.set('agent', form.agent);
     const { data } = await axios.get(`${TEMPLATES_API}?${params.toString()}`);
     const items = Array.isArray(data?.items) ? data.items : [];
     templates.value = items.map((template, index) => ({
@@ -494,11 +518,11 @@ async function loadTemplates() {
 }
 
 async function syncTemplates() {
-  if (form.channel !== 'whatsapp') return;
+  if (form.channel !== 'whatsapp' || !form.agent) return;
   templatesLoading.value = true;
   try {
     const params = new URLSearchParams();
-    if (form.agent) params.set('agent', form.agent);
+    params.set('agent', form.agent);
     params.set('sync', '1');
     await axios.get(`${TEMPLATES_API}?${params.toString()}`);
     await loadTemplates();
@@ -844,6 +868,19 @@ watch(
 watch(
   () => form.channel,
   channel => {
+    if (!channel) {
+      form.agent = '';
+      form.recipients = form.recipients.map(recipient => ({
+        name: recipient.name || '',
+        email: undefined,
+        phone: undefined,
+        vars: recipient.vars || {},
+      }));
+      form.payload = { message: 'Olá {{name}}!', messagesByDay: {} };
+      templates.value = [];
+      selectedTemplateKey.value = '';
+      return;
+    }
     form.recipients = form.recipients.map(recipient => ({
       name: recipient.name || '',
       email: channel === 'email' ? recipient.email || '' : undefined,
@@ -857,12 +894,19 @@ watch(
         text: form.payload.text || '',
         html: form.payload.html || '',
       };
+      templates.value = [];
+      selectedTemplateKey.value = '';
     } else {
       form.payload = {
         message: form.payload.message || 'Olá {{name}}!',
         messagesByDay: form.payload.messagesByDay || {},
       };
-      loadTemplates();
+      if (form.agent) {
+        loadTemplates();
+      } else {
+        templates.value = [];
+        selectedTemplateKey.value = '';
+      }
     }
 
     nextTick(recomputeRequiredPlaceholders);
@@ -912,9 +956,13 @@ watch(
 
 watch(
   () => form.agent,
-  () => {
-    if (form.channel === 'whatsapp') {
+  value => {
+    if (form.channel !== 'whatsapp') return;
+    if (value) {
       loadTemplates();
+    } else {
+      templates.value = [];
+      selectedTemplateKey.value = '';
     }
   }
 );
@@ -938,7 +986,7 @@ watch(
 
 onMounted(() => {
   loadAgents();
-  if (form.channel === 'whatsapp') loadTemplates();
+  if (form.channel === 'whatsapp' && form.agent) loadTemplates();
   recomputeRequiredPlaceholders();
 });
 </script>
@@ -971,8 +1019,18 @@ onMounted(() => {
         </label>
         <select
           v-model="form.channel"
-          class="rounded-xl border border-n-weak bg-n-background px-4 py-3 text-sm text-n-slate-12 focus:border-n-brand focus:outline-none"
+          class="rounded-xl px-4 py-3 text-sm focus:outline-none"
+          :class="[
+            canSelectChannel
+              ? 'border border-n-weak bg-n-background text-n-slate-12 focus:border-n-brand'
+              : 'border border-n-ruby-8 bg-n-solid-2 text-n-slate-9 cursor-not-allowed',
+          ]"
+          :disabled="!canSelectChannel"
+          :title="!canSelectChannel ? text.tooltips.channel : ''"
         >
+          <option disabled value="">
+            {{ text.channel.placeholder }}
+          </option>
           <option value="whatsapp">{{ text.channel.options.whatsapp }}</option>
           <option value="email">{{ text.channel.options.email }}</option>
         </select>
@@ -987,8 +1045,14 @@ onMounted(() => {
       </label>
       <select
         v-model="form.agent"
-        class="w-full rounded-xl border border-n-weak bg-n-background px-4 py-3 text-sm text-n-slate-12 focus:border-n-brand focus:outline-none md:w-80"
-        :disabled="agentsLoading"
+        class="w-full rounded-xl px-4 py-3 text-sm md:w-80 focus:outline-none"
+        :class="[
+          agentsLoading || !canSelectAgent
+            ? 'border border-n-ruby-8 bg-n-solid-2 text-n-slate-9 cursor-not-allowed'
+            : 'border border-n-weak bg-n-background text-n-slate-12 focus:border-n-brand',
+        ]"
+        :disabled="agentsLoading || !canSelectAgent"
+        :title="!canSelectAgent ? text.tooltips.agent : ''"
       >
         <option value="" disabled>{{ text.agent.placeholder }}</option>
         <option
