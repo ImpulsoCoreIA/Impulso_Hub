@@ -31,7 +31,7 @@ const DAYS_OF_WEEK = [
 const text = Object.freeze({
   name: {
     label: 'Nome do agendamento',
-    placeholder: 'boas-vindas',
+    placeholder: 'Insira o nome do agendamento aqui',
   },
   channel: {
     label: 'Canal',
@@ -46,11 +46,12 @@ const text = Object.freeze({
     agent: 'Selecione o canal para habilitar os agentes disponíveis.',
   },
   agent: {
-    label: 'Agente / remetente',
+    label: 'Telefone de Canal/Inbox',
     hint: 'Mensagens serão enviadas a partir do número selecionado.',
     placeholder: 'Selecionar...',
   },
   customField: {
+    title: 'Variáveis',
     placeholder: 'nova_variavel',
     add: 'Adicionar variável',
   },
@@ -63,6 +64,7 @@ const text = Object.freeze({
     add: 'Adicionar',
     empty: 'Adicione manualmente ou importe via CSV para iniciar o envio.',
     remove: 'Remover',
+    firstContact: 'Primeiro contato',
     name: 'Nome',
     email: 'Email',
     phone: 'Telefone (WhatsApp)',
@@ -81,7 +83,7 @@ const text = Object.freeze({
     },
   },
   content: {
-    title: 'Conteúdo da mensagem',
+    title: 'Template de primeiro contato',
     description:
       'Personalize o conteúdo com variáveis utilizando o formato {{name}}.',
     subject: 'Assunto',
@@ -182,10 +184,11 @@ const oneShot = ref(false);
 const submitting = ref(false);
 const status = reactive({ show: false, ok: true, msg: '' });
 const csvReport = ref(null);
-const newVariable = ref('');
 const requiredPlaceholders = ref(new Set());
+const knownVariables = ref(new Map());
 const placeholderGlobalError = ref('');
 const placeholderDaysError = ref('');
+const templateFallback = ref(null);
 
 const isEdit = computed(() => Boolean(props.value?.Name));
 const isNameFilled = computed(() => !!form.name.trim());
@@ -210,12 +213,109 @@ const selectedTemplate = computed(
     ) || null
 );
 
+const showFirstContactTemplate = computed(() =>
+  form.recipients.some(recipient => Boolean(recipient.primeiroContato))
+);
+
+const TEMPLATE_PLACEHOLDER_REGEX = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
+
+function combineTemplateTextFromComponents(components) {
+  const sections = [];
+  (components || []).forEach(component => {
+    const type = (component?.type || '').toUpperCase();
+    const text = component?.text || '';
+    if (!text) return;
+    if (type === 'HEADER' && (component?.format || '').toUpperCase() === 'TEXT') {
+      sections.push(text);
+    } else if (type === 'BODY') {
+      sections.push(text);
+    } else if (type === 'FOOTER') {
+      sections.push(text);
+    }
+  });
+  return sections.join('\n\n');
+}
+
+function extractPlaceholdersFromComponents(components) {
+  const flat = [];
+  const byComponent = {};
+
+  (components || []).forEach(component => {
+    const type = (component?.type || '').toLowerCase();
+    const text = component?.text || '';
+    if (!text) return;
+
+    TEMPLATE_PLACEHOLDER_REGEX.lastIndex = 0;
+    const entries = [];
+    let match = TEMPLATE_PLACEHOLDER_REGEX.exec(text);
+    while (match) {
+      const rawKey = (match[1] || '').trim();
+      const positionalMatch = /^var(\d+)$/i.exec(rawKey);
+      const normalized = positionalMatch
+        ? positionalMatch[1]
+        : normalizeVarKey(rawKey);
+      if (normalized) {
+        entries.push({ raw: rawKey, normalized });
+        if (!flat.includes(normalized)) {
+          flat.push(normalized);
+        }
+      }
+      match = TEMPLATE_PLACEHOLDER_REGEX.exec(text);
+    }
+
+    if (entries.length) {
+      byComponent[type] = entries;
+    }
+  });
+
+  return { flat, byComponent };
+}
+
+function buildTemplateFallbackObject(template) {
+  if (!template) return null;
+
+  const fallback = {
+    name: template.name,
+    language: template.language,
+    category: template.category,
+  };
+
+  if (template.parameterFormat) {
+    fallback.parameter_format = template.parameterFormat;
+  }
+
+  const params = {};
+  const entriesByComponent = template.placeholderEntries || {};
+  Object.entries(entriesByComponent).forEach(([component, entries]) => {
+    if (!entries?.length) return;
+    const mapping = {};
+    entries.forEach(({ raw, normalized }) => {
+      if (!normalized) return;
+      const positionalMatch = /^var(\d+)$/.exec(raw);
+      const paramKey = positionalMatch ? positionalMatch[1] : raw;
+      mapping[paramKey] = `{{vars.${normalized}}}`;
+    });
+    if (Object.keys(mapping).length) {
+      params[component] = mapping;
+    }
+  });
+
+  if (Object.keys(params).length) {
+    fallback.params = params;
+  }
+
+  return fallback;
+}
+
 function normalizeVarKey(value) {
-  return (value || '')
+  const trimmed = (value || '')
     .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_.-]/g, '_');
+    .trim();
+  const positionalMatch = /^var(\d+)$/i.exec(trimmed);
+  if (positionalMatch) {
+    return positionalMatch[1];
+  }
+  return trimmed.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
 }
 
 function normalizeHeader(value) {
@@ -253,18 +353,29 @@ function recipientHasValue(recipient, key) {
 }
 
 function extractPlaceholders(textValue) {
-  const placeholders = new Set();
+  const placeholders = new Map();
   if (!textValue) return placeholders;
   const regex = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
   let match = regex.exec(textValue);
   while (match) {
-    placeholders.add(normalizeVarKey(match[1]));
+    const raw = (match[1] || '').trim();
+    const normalized = normalizeVarKey(raw);
+    if (normalized) {
+      if (!placeholders.has(normalized)) {
+        placeholders.set(normalized, raw);
+      }
+    }
     match = regex.exec(textValue);
   }
   return placeholders;
 }
 
 function placeholdersSatisfied() {
+  if (!showFirstContactTemplate.value) {
+    placeholderGlobalError.value = '';
+    placeholderDaysError.value = '';
+    return true;
+  }
   const requiredKeys = Array.from(requiredPlaceholders.value || []);
   if (!requiredKeys.length) {
     placeholderGlobalError.value = '';
@@ -332,7 +443,7 @@ const isValid = computed(() => {
     form.daysOfWeek.length > 0 && Boolean(form.time) && Boolean(form.timezone);
   if (!dayConfigurationValid) return false;
 
-  if (form.channel === 'whatsapp') {
+  if (form.channel === 'whatsapp' && showFirstContactTemplate.value) {
     const allDaysHaveMessage = form.daysOfWeek.every(day => {
       const content = form.payload?.messagesByDay?.[day] || '';
       return Boolean(content.trim());
@@ -344,6 +455,12 @@ const isValid = computed(() => {
 });
 
 function recomputeRequiredPlaceholders() {
+  if (!showFirstContactTemplate.value) {
+    requiredPlaceholders.value = new Set();
+    placeholderGlobalError.value = '';
+    placeholderDaysError.value = '';
+    return;
+  }
   const bucket = new Set();
   if (form.channel === 'email') {
     ['subject', 'text', 'html'].forEach(key => {
@@ -368,6 +485,20 @@ function recomputeRequiredPlaceholders() {
   placeholdersSatisfied();
 }
 
+watch(showFirstContactTemplate, value => {
+  if (!value) {
+    requiredPlaceholders.value = new Set();
+    placeholderGlobalError.value = '';
+    placeholderDaysError.value = '';
+    templateFallback.value = null;
+  } else {
+    if (selectedTemplate.value && !templateFallback.value) {
+      templateFallback.value = buildTemplateFallbackObject(selectedTemplate.value);
+    }
+    recomputeRequiredPlaceholders();
+  }
+});
+
 function resetForm() {
   form.name = '';
   form.channel = '';
@@ -388,10 +519,10 @@ function resetForm() {
   status.show = false;
   status.msg = '';
   status.ok = true;
-  newVariable.value = '';
   requiredPlaceholders.value = new Set();
   placeholderGlobalError.value = '';
   placeholderDaysError.value = '';
+  templateFallback.value = null;
 }
 
 function hydrateFromValue(value) {
@@ -414,6 +545,19 @@ function hydrateFromValue(value) {
     ? JSON.parse(JSON.stringify(value.Recipients))
     : [];
 
+  form.recipients = form.recipients.map(recipient => ({
+    name: recipient.name || '',
+    email: recipient.email,
+    phone: recipient.phone,
+    vars: Object.fromEntries(
+      Object.entries(recipient.vars || {}).map(([key, value]) => [
+        normalizeVarKey(key),
+        value,
+      ])
+    ),
+    primeiroContato: Boolean(recipient.primeiroContato),
+  }));
+
   const collected = new Set();
   form.recipients.forEach(recipient => {
     if (recipient && typeof recipient.vars === 'object') {
@@ -433,6 +577,7 @@ function hydrateFromValue(value) {
     payload.messagesByDay = {};
   }
   form.payload = payload;
+  templateFallback.value = value.Payload?.template_fallback || null;
 
   form.enabled = Boolean(value.Enabled);
   form.startAt = value.StartAt || '';
@@ -491,25 +636,79 @@ async function loadTemplates() {
   if (form.channel !== 'whatsapp' || !form.agent) {
     templates.value = [];
     selectedTemplateKey.value = '';
+    templateFallback.value = null;
     return;
   }
   templatesLoading.value = true;
   templates.value = [];
-  selectedTemplateKey.value = '';
   try {
     const params = new URLSearchParams();
     params.set('agent', form.agent);
     const { data } = await axios.get(`${TEMPLATES_API}?${params.toString()}`);
-    const items = Array.isArray(data?.items) ? data.items : [];
-    templates.value = items.map((template, index) => ({
-      key: `${template.name}::${template.language || template.locale || 'und'}::${index}`,
-      name: template.name,
-      title: `${template.name}${template.language ? ` (${template.language})` : ''}`,
-      text: template.text || '',
-      placeholders: Array.isArray(template.placeholders)
-        ? template.placeholders.map(normalizeVarKey)
-        : [],
-    }));
+    const inboxId = data?.inbox_id ? Number(data.inbox_id) : null;
+    const rawItems = Array.isArray(data?.items) ? data.items : [];
+
+    const flattened = [];
+
+    const pushTemplate = (template, index = 0) => {
+      if (!template) return;
+      const components = template.components || [];
+      const preview =
+        combineTemplateTextFromComponents(components) ||
+        template.text ||
+        template.content ||
+        '';
+      const placeholderInfo = extractPlaceholdersFromComponents(components);
+      const language = template.language || template.language_code || '';
+      const name = template.name || '';
+      const category = template.category || template.type || '';
+      const status = template.status || '';
+      flattened.push({
+        key: `${name || 'template'}::${language || 'und'}::${flattened.length}-${index}`,
+        name,
+        title: `${name}${language ? ` (${language})` : ''}`,
+        text: preview,
+        language,
+        category,
+        status,
+        placeholders: placeholderInfo.flat,
+        placeholderEntries: placeholderInfo.byComponent,
+        parameterFormat: (template.parameter_format || template.parameterFormat || '').toUpperCase() || '',
+        raw: template,
+      });
+    };
+
+    rawItems.forEach(item => {
+      const source = item?.raw || item;
+      const sourceInboxId = source?.id ? Number(source.id) : null;
+      if (inboxId && sourceInboxId && sourceInboxId !== inboxId) {
+        return;
+      }
+      const messageTemplates = source?.message_templates;
+      if (Array.isArray(messageTemplates) && messageTemplates.length) {
+        messageTemplates.forEach((tpl, idx) => pushTemplate(tpl, idx));
+      } else {
+        pushTemplate(item, 0);
+      }
+    });
+
+    templates.value = flattened;
+
+    if (!flattened.length) {
+      templateFallback.value = null;
+      selectedTemplateKey.value = '';
+    } else if (templateFallback.value?.name) {
+      const matched = flattened.find(template => {
+        if (template.name !== templateFallback.value.name) return false;
+        if (templateFallback.value.language && template.language) {
+          return template.language === templateFallback.value.language;
+        }
+        return true;
+      });
+      selectedTemplateKey.value = matched?.key || '';
+    } else {
+      selectedTemplateKey.value = '';
+    }
   } catch (error) {
     useAlert(text.alerts.templates);
   } finally {
@@ -544,23 +743,8 @@ function applyTemplate() {
     ].filter(Boolean)
   );
   form.customFields = Array.from(merged);
+  templateFallback.value = buildTemplateFallbackObject(selectedTemplate.value);
   nextTick(recomputeRequiredPlaceholders);
-}
-
-function addCustomField() {
-  const key = normalizeVarKey(newVariable.value);
-  if (!key) return;
-  if (!form.customFields.includes(key)) {
-    form.customFields = [...form.customFields, key];
-  }
-  form.recipients = form.recipients.map(recipient => ({
-    ...recipient,
-    vars: {
-      ...(recipient.vars || {}),
-      [key]: recipient.vars?.[key] || '',
-    },
-  }));
-  newVariable.value = '';
 }
 
 function addRecipient() {
@@ -574,6 +758,7 @@ function addRecipient() {
       phone: form.channel === 'whatsapp' ? '' : undefined,
       email: form.channel === 'email' ? '' : undefined,
       vars,
+      primeiroContato: false,
     },
   ];
   nextTick(recomputeRequiredPlaceholders);
@@ -718,7 +903,12 @@ function handleCsvUpload(event) {
             return;
           }
           existingKeys.add(key);
-          freshRecipients.push({ name, email, vars });
+          freshRecipients.push({
+            name,
+            email,
+            vars,
+            primeiroContato: false,
+          });
           imported += 1;
         } else {
           if (!phone || !isLikelyPhone(phone)) {
@@ -731,7 +921,12 @@ function handleCsvUpload(event) {
             return;
           }
           existingKeys.add(normalizedPhone);
-          freshRecipients.push({ name, phone: normalizedPhone, vars });
+          freshRecipients.push({
+            name,
+            phone: normalizedPhone,
+            vars,
+            primeiroContato: false,
+          });
           imported += 1;
         }
       });
@@ -785,31 +980,50 @@ function downloadCsvTemplate() {
 }
 
 function buildPayload() {
+  const recipientsPayload = form.recipients.map(recipient => ({
+    name: recipient.name || '',
+    email: recipient.email,
+    phone: recipient.phone,
+    vars: recipient.vars || {},
+    primeiroContato: Boolean(recipient.primeiroContato),
+  }));
+
+  const templateFallbackPayload =
+    form.channel === 'whatsapp' && showFirstContactTemplate.value && templateFallback.value
+      ? JSON.parse(JSON.stringify(templateFallback.value))
+      : null;
+
+  let channelPayload;
+  if (form.channel === 'email') {
+    channelPayload = {
+      subject: form.payload?.subject || text.content.subjectPlaceholder,
+      text: form.payload?.text || '',
+      html: form.payload?.html || '',
+    };
+  } else {
+    channelPayload = {
+      message: form.payload?.message || 'Olá {{name}}!',
+      messagesByDay:
+        !oneShot.value && form.channel === 'whatsapp'
+          ? form.daysOfWeek.reduce((acc, day) => {
+              const value = (form.payload?.messagesByDay?.[day] || '').trim();
+              if (value) acc[day] = value;
+              return acc;
+            }, {})
+          : undefined,
+    };
+
+    if (templateFallbackPayload) {
+      channelPayload.template_fallback = templateFallbackPayload;
+    }
+  }
+
   const base = {
     name: form.name,
     channel: form.channel,
     agent: form.channel === 'whatsapp' ? form.agent || undefined : undefined,
-    recipients: form.recipients,
-    payload:
-      form.channel === 'email'
-        ? {
-            subject: form.payload?.subject || text.content.subjectPlaceholder,
-            text: form.payload?.text || '',
-            html: form.payload?.html || '',
-          }
-        : {
-            message: form.payload?.message || 'Olá {{name}}!',
-            messagesByDay:
-              !oneShot.value && form.channel === 'whatsapp'
-                ? form.daysOfWeek.reduce((acc, day) => {
-                    const value = (
-                      form.payload?.messagesByDay?.[day] || ''
-                    ).trim();
-                    if (value) acc[day] = value;
-                    return acc;
-                  }, {})
-                : undefined,
-          },
+    recipients: recipientsPayload,
+    payload: channelPayload,
     enabled: Boolean(form.enabled),
     startAt: form.startAt?.trim() || undefined,
     endAt: form.endAt?.trim() || undefined,
@@ -874,18 +1088,31 @@ watch(
         name: recipient.name || '',
         email: undefined,
         phone: undefined,
-        vars: recipient.vars || {},
+        vars: Object.fromEntries(
+          Object.entries(recipient.vars || {}).map(([key, value]) => [
+            normalizeVarKey(key),
+            value,
+          ])
+        ),
+        primeiroContato: Boolean(recipient.primeiroContato),
       }));
       form.payload = { message: 'Olá {{name}}!', messagesByDay: {} };
       templates.value = [];
       selectedTemplateKey.value = '';
+      templateFallback.value = null;
       return;
     }
     form.recipients = form.recipients.map(recipient => ({
       name: recipient.name || '',
       email: channel === 'email' ? recipient.email || '' : undefined,
       phone: channel === 'whatsapp' ? recipient.phone || '' : undefined,
-      vars: recipient.vars || {},
+      vars: Object.fromEntries(
+        Object.entries(recipient.vars || {}).map(([key, value]) => [
+          normalizeVarKey(key),
+          value,
+        ])
+      ),
+      primeiroContato: Boolean(recipient.primeiroContato),
     }));
 
     if (channel === 'email') {
@@ -896,6 +1123,7 @@ watch(
       };
       templates.value = [];
       selectedTemplateKey.value = '';
+      templateFallback.value = null;
     } else {
       form.payload = {
         message: form.payload.message || 'Olá {{name}}!',
@@ -963,6 +1191,7 @@ watch(
     } else {
       templates.value = [];
       selectedTemplateKey.value = '';
+      templateFallback.value = null;
     }
   }
 );
@@ -1069,60 +1298,72 @@ onMounted(() => {
     </section>
 
     <section class="space-y-4">
-      <header class="flex flex-wrap items-center justify-between gap-3">
-        <div class="space-y-1">
-          <h2 class="text-base font-semibold text-n-slate-12">
-            {{ text.recipients.title }}
-          </h2>
-          <p class="text-xs text-n-slate-10">{{ text.recipients.subtitle }}</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <input
-            v-model="newVariable"
-            class="w-full rounded-xl border border-n-weak bg-n-background px-4 py-2 text-xs text-n-slate-12 focus:border-n-brand focus:outline-none"
-            :placeholder="text.customField.placeholder"
-            @keyup.enter.prevent="addCustomField"
-          />
-          <Button
-            variant="ghost"
-            color="slate"
-            size="sm"
-            icon="i-lucide-list-plus"
-            :label="text.customField.add"
-            type="button"
-            @click="addCustomField"
-          />
-          <div class="relative">
-            <button
-              type="button"
-              class="rounded-xl border border-n-weak bg-n-background px-4 py-2 text-xs font-medium text-n-slate-11 shadow-sm hover:bg-n-solid-1"
-            >
-              {{ text.recipients.import }}
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                @change="handleCsvUpload"
-              />
-            </button>
+      <header class="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div class="flex flex-col gap-3">
+          <div class="space-y-1">
+            <h2 class="text-base font-semibold text-n-slate-12">
+              {{ text.recipients.title }}
+            </h2>
+            <p class="text-xs text-n-slate-10">{{ text.recipients.subtitle }}</p>
           </div>
-          <Button
-            variant="ghost"
-            color="slate"
-            size="sm"
-            icon="i-lucide-download"
-            :label="text.recipients.download"
-            type="button"
-            @click="downloadCsvTemplate"
-          />
-          <Button
-            color="blue"
-            size="sm"
-            icon="i-lucide-user-plus"
-            :label="text.recipients.add"
-            type="button"
-            @click="addRecipient"
-          />
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="relative">
+              <button
+                type="button"
+                class="rounded-xl border border-n-weak bg-n-background px-4 py-2 text-xs font-medium text-n-slate-11 shadow-sm hover:bg-n-solid-1"
+              >
+                {{ text.recipients.import }}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  @change="handleCsvUpload"
+                />
+              </button>
+            </div>
+            <Button
+              variant="ghost"
+              color="slate"
+              size="sm"
+              icon="i-lucide-download"
+              :label="text.recipients.download"
+              type="button"
+              @click="downloadCsvTemplate"
+            />
+            <Button
+              color="blue"
+              size="sm"
+              icon="i-lucide-user-plus"
+              :label="text.recipients.add"
+              type="button"
+              @click="addRecipient"
+            />
+          </div>
+        </div>
+        <div class="flex w-full flex-col gap-2">
+          <label
+            class="text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+          >
+            {{ text.customField.title }}
+          </label>
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <input
+              v-model="newVariable"
+              class="w-full rounded-xl border border-n-weak bg-n-background px-4 py-3 text-sm text-n-slate-12 focus:border-n-brand focus:outline-none"
+              :placeholder="text.customField.placeholder"
+              @keyup.enter.prevent="addCustomField"
+            />
+            <Button
+              variant="ghost"
+              color="slate"
+              size="sm"
+              icon="i-lucide-list-plus"
+              :label="text.customField.add"
+              type="button"
+              class="sm:w-auto"
+              @click="addCustomField"
+            />
+          </div>
         </div>
       </header>
 
@@ -1194,7 +1435,19 @@ onMounted(() => {
               </div>
             </div>
 
-            <div class="flex justify-between">
+            <div
+              class="flex flex-wrap items-center justify-between gap-3"
+            >
+              <label
+                class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+              >
+                <input
+                  v-model="recipient.primeiroContato"
+                  type="checkbox"
+                  class="h-4 w-4 rounded border border-n-weak text-n-brand focus:ring-n-brand"
+                />
+                {{ text.recipients.firstContact }}
+              </label>
               <Button
                 variant="ghost"
                 color="ruby"
@@ -1221,7 +1474,7 @@ onMounted(() => {
       </div>
     </section>
 
-    <section class="space-y-6">
+    <section v-if="showFirstContactTemplate" class="space-y-6">
       <header class="space-y-1">
         <h2 class="text-base font-semibold text-n-slate-12">
           {{ text.content.title }}

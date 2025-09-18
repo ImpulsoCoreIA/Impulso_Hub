@@ -407,7 +407,7 @@ const menuItems = computed(() => {
     },
     {
       name: 'event_registration',
-      label: 'Cadastro de Eventos',
+      label: 'Agendamentos',
       icon: 'i-lucide-calendar',
       to: accountScopedRoute('event_registration'),
     },
