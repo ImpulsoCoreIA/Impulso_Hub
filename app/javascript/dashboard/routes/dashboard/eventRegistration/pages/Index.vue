@@ -907,7 +907,7 @@ onBeforeUnmount(() => {
 
       <Dialog
         ref="formDialogRef"
-        width="4xl"
+        width="7xl"
         :overflow-y-auto="true"
         :title="
           selectedSchedule ? text.buttons.editSchedule : text.buttons.create

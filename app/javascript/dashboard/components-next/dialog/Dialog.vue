@@ -52,7 +52,7 @@ const props = defineProps({
     type: String,
     default: 'lg',
     validator: value =>
-      ['4xl', '3xl', '2xl', 'xl', 'lg', 'md', 'sm'].includes(value),
+      ['7xl', '6xl', '5xl', '4xl', '3xl', '2xl', 'xl', 'lg', 'md', 'sm'].includes(value),
   },
 });
 
@@ -65,6 +65,9 @@ const dialogContentRef = ref(null);
 
 const maxWidthClass = computed(() => {
   const classesMap = {
+    '7xl': 'max-w-7xl',
+    '6xl': 'max-w-6xl',
+    '5xl': 'max-w-5xl',
     '4xl': 'max-w-4xl',
     '3xl': 'max-w-3xl',
     '2xl': 'max-w-2xl',

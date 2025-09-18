@@ -993,7 +993,7 @@ onMounted(() => {
 
 <template>
   <form
-    class="flex max-h-[72vh] flex-col gap-8 overflow-y-auto pr-1"
+    class="flex w-full max-h-[72vh] flex-col gap-8 overflow-y-auto pr-1"
     @submit.prevent="submit"
   >
     <section class="grid gap-6 md:grid-cols-2">
@@ -1045,7 +1045,7 @@ onMounted(() => {
       </label>
       <select
         v-model="form.agent"
-        class="w-full rounded-xl px-4 py-3 text-sm md:w-80 focus:outline-none"
+        class="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
         :class="[
           agentsLoading || !canSelectAgent
             ? 'border border-n-ruby-8 bg-n-solid-2 text-n-slate-9 cursor-not-allowed'
@@ -1079,7 +1079,7 @@ onMounted(() => {
         <div class="flex flex-wrap items-center gap-2">
           <input
             v-model="newVariable"
-            class="w-full rounded-xl border border-n-weak bg-n-background px-4 py-2 text-xs text-n-slate-12 focus:border-n-brand focus:outline-none md:w-48"
+            class="w-full rounded-xl border border-n-weak bg-n-background px-4 py-2 text-xs text-n-slate-12 focus:border-n-brand focus:outline-none"
             :placeholder="text.customField.placeholder"
             @keyup.enter.prevent="addCustomField"
           />
@@ -1276,7 +1276,7 @@ onMounted(() => {
         <div class="flex flex-wrap items-center gap-2">
           <select
             v-model="selectedTemplateKey"
-            class="w-full rounded-xl border border-n-weak bg-n-background px-4 py-3 text-sm text-n-slate-12 focus:border-n-brand focus:outline-none md:w-60"
+            class="w-full rounded-xl border border-n-weak bg-n-background px-4 py-3 text-sm text-n-slate-12 focus:border-n-brand focus:outline-none"
             :disabled="templatesLoading || !templates.length"
           >
             <option value="" disabled>
